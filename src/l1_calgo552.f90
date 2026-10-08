@@ -150,22 +150,7 @@ contains
       simplex: do
           if (to_phase2) then
 ! SET UP PHASE 2 COSTS.
-              iphase = 2
-              cu = 0.0_wp
-              cu(:,n1:nk) = 1.0_wp
-              phase2_costs: do i = 1,klm
-                  ii = int(q(i,n2))
-                  if (ii > 0) then
-                      if (iu(1,ii) == 0) cycle phase2_costs
-                      cu(1,ii) = 0.0_wp
-                  else
-                      ii = -ii
-                      if (iu(2,ii) == 0) cycle phase2_costs
-                      cu(2,ii) = 0.0_wp
-                  end if
-                  iq = iq + 1
-                  call swap_rows(q, iq, i, n2)
-              end do phase2_costs
+              call set_up_phase2_costs(n, k, klm, iu, q, cu, iq, iphase)
           end if
 ! COMPUTE THE MARGINAL COSTS.
           call compute_marginal_costs(n, klm, js, cu, q)
@@ -607,5 +592,52 @@ contains
          end if
       end do
    end subroutine apply_sign_restrictions
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine set_up_phase2_costs(n, k, klm, restricted, q, costs, num_restricted_rows, phase)
+      !! Set up the costs of the second phase of the simplex method.
+      !!
+      !! In the second phase only the residuals of the `k` equations `A x = b` (the variables
+      !! `n+1:n+k`) cost something. The variables that are basic at the end of the first phase and
+      !! whose current sign is restricted (the artificial variables of the equality constraints, and
+      !! the variables restricted through `kode = 1`) get a cost of 0, and their rows are moved to
+      !! the top of the tableau, because they must leave the basis first.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: k
+         !! Number of rows of the matrix `A`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      integer, contiguous, intent(in) :: restricted(:, :)
+         !! Restriction flags of the variables, one row for each sign
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau with at least `klm+2` rows and `n+2` columns: rows are exchanged
+      real(wp), contiguous, intent(out) :: costs(:, :)
+         !! Phase 2 costs of the variables, one row for each sign
+      integer, intent(inout) :: num_restricted_rows
+         !! Number of rows at the top of the tableau that hold a basic variable with a restricted
+         !! sign: increased by one for each row that is moved
+      integer, intent(out) :: phase
+         !! Always 2
+      integer :: i, label
+
+      phase = 2
+      costs = 0.0_wp
+      costs(:, n + 1:n + k) = 1.0_wp
+      move_restricted_rows: do i = 1, klm
+         label = int(q(i, n + 2))
+         if (label > 0) then
+            if (restricted(1, label) == 0) cycle move_restricted_rows
+            costs(1, label) = 0.0_wp
+         else
+            label = -label
+            if (restricted(2, label) == 0) cycle move_restricted_rows
+            costs(2, label) = 0.0_wp
+         end if
+         num_restricted_rows = num_restricted_rows + 1
+         call swap_rows(q, num_restricted_rows, i, n + 2)
+      end do move_restricted_rows
+   end subroutine set_up_phase2_costs
 
 end module l1_calgo552

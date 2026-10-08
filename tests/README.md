@@ -129,6 +129,13 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   logic, the `kode` call-site test); the narrowest kill is a negative-sign residual restriction
   whose row label is positive (8 failing tests). No new generator was needed: the sign-restricted
   and boundary generators added earlier cover these branches.
+* **Phase 2 set-up (`set_up_phase2_costs`, 9 mutations run)** - 7 killed (residual cost ranges and signs,
+  restriction test of either sign, rows counted but not moved, rows moved but not counted). Two survive:
+  *not resetting the cost to 0* of a restricted variable, for the positive or the negative label. Not a
+  generator gap: on a throw-away instrumented copy of the frozen oracle the reset never changed a
+  value in the whole corpus (2627 cases) nor in 3500 extra problems that were mostly residual sign
+  restrictions. Empirical, not a proof; the reset looks like defensive symmetry in the original code.
+  A tenth mutation (leaving `phase = 1` after the set-up) makes the solver loop forever and cannot be run.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
