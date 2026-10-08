@@ -99,7 +99,7 @@ contains
       integer :: alloc_stat
 !     ..
 !     .. Local Scalars ..
-      real(wp) :: cuv, pivot, tpivot, xmax, xmin, tmp1, zu, zv
+      real(wp) :: cuv, pivot, xmax, xmin, tmp1, zu, zv
       integer :: i, iq, ii, iineg, in, iout, iphase, j, js, kforce, kk
       integer :: klm, klm1, klm2, max_iter, n1, n2, nk
       logical :: to_phase2, at_optimum, pivot_found
@@ -293,28 +293,9 @@ contains
                   exit simplex
               end if
               iter = iter + 1
-              do j = js,n1
-                  if (j /= in) q(iout,j) = q(iout,j)/pivot
-              end do
-! NOTE: the original paper suggests replacing the next loop nest by a helper that adds a multiple
-! of one column to another, for compilers that can pass a column of a 2-D array to a 1-D dummy
-! argument; see legacy/CALGO552.f.
-              eliminate_columns: do j = js,n1
-                  if (j == in) cycle eliminate_columns
-                  tmp1 = -q(iout,j)
-                  do i = 1,klm1
-                      if (i /= iout) q(i,j) = q(i,j) + tmp1*q(i,in)
-                  end do
-              end do eliminate_columns
-              tpivot = -pivot
-              do i = 1,klm1
-                  if (i /= iout) q(i,in) = q(i,in)/tpivot
-              end do
-              q(iout,in) = 1.0_wp/pivot
-              tmp1 = q(iout,n2)
-              q(iout,n2) = q(klm2,in)
-              q(klm2,in) = tmp1
-              ii = int(abs(tmp1))
+              call pivot_tableau(n, klm, js, in, iout, pivot, q)
+! THE LABEL OF THE VARIABLE THAT LEFT THE BASIS IS NOW IN Q(KLM2,IN).
+              ii = int(abs(q(klm2,in)))
               if (iu(1,ii) == 0 .or. iu(2,ii) == 0) cycle iterate
               call swap_columns(q, in, js, klm2)
               js = js + 1
@@ -639,5 +620,60 @@ contains
          call swap_rows(q, num_restricted_rows, i, n + 2)
       end do move_restricted_rows
    end subroutine set_up_phase2_costs
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine pivot_tableau(n, klm, first_column, pivot_column, pivot_row, pivot_value, q)
+      !! Perform one Gauss-Jordan pivot step on the simplex tableau `q`.
+      !!
+      !! The variable of the column `pivot_column` enters the basis in the row `pivot_row`: the
+      !! pivot row is divided by the pivot, a multiple of it is added to every other row so that the
+      !! pivot column becomes a unit vector (stored in the compact form of the revised tableau,
+      !! with the pivot cell holding `1/pivot` and the rest of the column divided by `-pivot`),
+      !! and the labels of the entering and the leaving variable are exchanged. Only the columns
+      !! `first_column:n+1` and the rows `1:klm+1` are updated, the first columns having been
+      !! retired earlier.
+      !!
+      !! After the call `q(klm+2,pivot_column)` holds the label of the variable that left the basis.
+      !!
+      !! NOTE: the original paper suggests replacing the column elimination below by a helper that
+      !! adds a multiple of one column to another, for compilers that can pass a column of a 2-D
+      !! array to a 1-D dummy argument; see `legacy/CALGO552.f`.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      integer, intent(in) :: first_column
+         !! First column of the tableau that is still active
+      integer, intent(in) :: pivot_column
+         !! Column of the entering variable
+      integer, intent(in) :: pivot_row
+         !! Row of the leaving variable
+      real(wp), intent(in) :: pivot_value
+         !! The pivot, `q(pivot_row, pivot_column)` on entry
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau with at least `klm+2` rows and `n+2` columns
+      real(wp) :: multiplier, negative_pivot, label
+      integer :: i, j
+
+      do j = first_column, n + 1
+         if (j /= pivot_column) q(pivot_row, j) = q(pivot_row, j)/pivot_value
+      end do
+      eliminate_columns: do j = first_column, n + 1
+         if (j == pivot_column) cycle eliminate_columns
+         multiplier = -q(pivot_row, j)
+         do i = 1, klm + 1
+            if (i /= pivot_row) q(i, j) = q(i, j) + multiplier*q(i, pivot_column)
+         end do
+      end do eliminate_columns
+      negative_pivot = -pivot_value
+      do i = 1, klm + 1
+         if (i /= pivot_row) q(i, pivot_column) = q(i, pivot_column)/negative_pivot
+      end do
+      q(pivot_row, pivot_column) = 1.0_wp/pivot_value
+      label = q(pivot_row, n + 2)
+      q(pivot_row, n + 2) = q(klm + 2, pivot_column)
+      q(klm + 2, pivot_column) = label
+   end subroutine pivot_tableau
 
 end module l1_calgo552

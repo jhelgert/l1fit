@@ -136,6 +136,11 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   value in the whole corpus (2627 cases) nor in 3500 extra problems that were mostly residual sign
   restrictions. Empirical, not a proof; the reset looks like defensive symmetry in the original code.
   A tenth mutation (leaving `phase = 1` after the set-up) makes the solver loop forever and cannot be run.
+* **Gauss-Jordan step (`pivot_tableau`, 11 mutations)** - 10 killed on the first failing test (wrong sign of
+  the multiplier or of the pivot, skipped last column or objective row, pivot row modified, pivot cell not
+  inverted, labels not exchanged, wrong label read by the caller). One is an *equivalent mutant*,
+  established by reading the code: dropping the guard `j /= pivot_column` on the division of the pivot row
+  changes the pivot cell, which is not read before it is overwritten by `1/pivot`.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
