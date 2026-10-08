@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from solvers import Result
+from solvers import MAX_HANGS, Result, SolverHang, call_with_timeout, solve_timeout
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = Path(__file__).resolve().parent / "_build"
@@ -155,6 +155,7 @@ class FortranCL1:
             else (DEFAULT_TOLER if single else DEFAULT_TOLER_DOUBLE)
         )
         self._c_real = ctypes.c_float if single else ctypes.c_double
+        self._hangs = 0  # number of calls that did not return in time
         self._lib = ctypes.CDLL(str(build_library(sources, fflags)))
         self._real_arr = np.ctypeslib.ndpointer(dtype=self.dtype, flags="F_CONTIGUOUS")
         self._int_arr = np.ctypeslib.ndpointer(dtype=np.int32, flags="F_CONTIGUOUS")
@@ -241,7 +242,19 @@ class FortranCL1:
         kode_c, iter_c = ctypes.c_int(kode), ctypes.c_int(max_iter)
         toler_c, error_c = self._c_real(toler), self._c_real(0.0)
 
-        self._invoke(k, l, m, n, q, kode_c, toler_c, iter_c, x, res, error_c)
+        if self._hangs >= MAX_HANGS:
+            raise SolverHang(
+                f"{self.name}: {self._hangs} earlier calls did not return; failing immediately "
+                "instead of waiting again"
+            )
+        try:
+            call_with_timeout(
+                lambda: self._invoke(k, l, m, n, q, kode_c, toler_c, iter_c, x, res, error_c),
+                solve_timeout(),
+            )
+        except SolverHang:
+            self._hangs += 1
+            raise
         return Result(
             kode=int(kode_c.value),
             iterations=int(iter_c.value),

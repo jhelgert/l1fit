@@ -17,6 +17,9 @@ To plug in a new implementation, write an adapter and register it in
 
 from __future__ import annotations
 
+import os
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -35,6 +38,53 @@ class Result:
     """Solution vector, shape (n,)."""
     res: np.ndarray
     """Residuals b-Ax, d-Cx, f-Ex, shape (k+l+m,)."""
+
+
+class SolverHang(RuntimeError):
+    """A solver call did not return within the time limit (it is probably looping forever)."""
+
+
+DEFAULT_SOLVE_TIMEOUT = 30.0
+"""Seconds. The slowest legitimate call (the ``-O0 -fcheck=all`` build on the 1000x250 instance) takes
+about 1.5 s. Override with the environment variable ``L1FIT_SOLVE_TIMEOUT``."""
+
+MAX_HANGS = 3
+"""After this many hangs an adapter fails every further call immediately instead of waiting again."""
+
+
+def solve_timeout() -> float:
+    return float(os.environ.get("L1FIT_SOLVE_TIMEOUT", DEFAULT_SOLVE_TIMEOUT))
+
+
+def call_with_timeout(function: Callable[[], None], timeout: float) -> None:
+    """Run ``function`` (a foreign call such as a ``ctypes`` call) and wait at most ``timeout`` seconds.
+
+    ``ctypes`` releases the GIL during a call, so the calling thread stays responsive. A foreign call
+    that does not return cannot be interrupted or killed from Python: its thread is abandoned (it is a
+    daemon thread, so it cannot block interpreter exit, but it keeps a core busy until then) and
+    :class:`SolverHang` is raised, so that a hang becomes an ordinary test failure.
+
+    Note that an iteration limit cannot do this job: a loop that never pivots never increments the
+    iteration counter.
+    """
+    outcome: dict[str, BaseException] = {}
+
+    def target() -> None:
+        try:
+            function()
+        except BaseException as exc:  # noqa: BLE001 - re-raised in the caller
+            outcome["error"] = exc
+
+    worker = threading.Thread(target=target, daemon=True, name="solver-call")
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        raise SolverHang(
+            f"the solver did not return within {timeout:g} s (probably an infinite loop); "
+            "the call is abandoned in a background thread"
+        )
+    if "error" in outcome:
+        raise outcome["error"]
 
 
 def available_solvers() -> dict[str, object]:

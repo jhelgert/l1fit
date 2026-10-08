@@ -187,6 +187,13 @@ legacy code, and exactly what validation was run and its result.
   hang or abort. Run them only against the bounds-checked build (`-fcheck=all -O0`) in a child process,
   one mutation per run, with a time limit (macOS has no `timeout`; use the tool's timeout), and restore
   the source after each. Keep a backup copy of the file under test and verify it is restored.
+- **Guard every foreign call with a wall-clock limit.** A refactoring bug (or a mutation) can make the
+  solver loop forever, and an iteration limit does not stop a loop that never reaches the iteration
+  counter (check where the counter is incremented before relying on it). Run `ctypes` calls in a daemon
+  worker thread with `join(timeout)`: the GIL is released, so the test thread survives, and the stuck
+  thread is simply abandoned. Count hangs and fail fast after a few, and give every subprocess a timeout too:
+  a compiled test program with no timeout kept a "protected" run alive indefinitely. Test the guard itself
+  with a call that blocks inside C (libc `sleep`).
 - **Keep suspicious test failures separate from library failures.** Several failures here were wrong test
   data or wrong expected values (non-unique L1 optimum, uninitialised comparison arrays, array
   temporaries from non-`contiguous` helper dummies). Check the test before changing the library.

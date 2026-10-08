@@ -26,6 +26,7 @@ Fortran can be modernized and wrapped as a CPython extension without silently ch
 | `test_l1_instances.py` | Correctness, closed-form, metamorphic and golden tests per adapter. |
 | `test_differential.py` | Bit-for-bit differential fuzzing against the frozen oracles. |
 | `fortran/check_cl1_interface.f90`, `test_fortran_interface.py` | Fortran program checking argument validation and oversized arrays (not reachable through the C ABI); built strictly with `-fcheck=all` and run by pytest. |
+| `test_hang_guard.py` | Tests of the protection against solver calls that never return (see "Hang protection"). |
 | `test_checked_build.py`, `run_checked_build.py` | All instances and fuzz cases against `src/` built with `-fcheck=all -O0`, in a child process (a violated run-time check aborts the whole process). |
 | `benchmark.py`, `benchmarks/legacy_baseline.json` | Timing runner and the recorded baseline of the legacy oracle (single precision). |
 
@@ -171,11 +172,7 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   objective condition passed by `cl1` (wrong cell, `<` for `<=`). **Three are non-terminating mutants** and
   were only "detected" by a hang (a 25 s wall-clock limit in the experiment): the restriction on the original
   variables is never lifted, and a `START_PHASE2` or `STOP` outcome acting like `CONTINUE`.
-  **Known limitation of the suite:** a bug that makes the solver loop forever hangs the test run instead of
-  failing it. A cheap fix is to pass the differential tests `max_iter = <oracle iterations> + margin` so a
-  looping candidate stops with `KODE = 3` and fails the comparison; it was not done because it changes
-  the inputs of the differential tests (a design decision). Never run non-terminating mutations without a
-  wall-clock limit.
+  A bug that makes the solver loop forever used to hang the whole test run; see "Hang protection" below.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
@@ -187,6 +184,32 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   * Never run undersized-workspace mutations against the unchecked `src` adapter: it hangs or crashes.
     Run them only against `tests/test_checked_build.py`, one at a time, with a time limit (macOS has no
     `timeout`; use the tool's own timeout or `gtimeout`).
+
+## Hang protection
+
+A mutation (or a real bug) can make the solver loop forever, for example in the optimality test, where a
+`cycle iterate` never reaches the pivot step. **An iteration limit cannot stop that**: `iter` is only
+incremented by the pivot step, so a loop that never pivots never counts. (An earlier version of this README
+proposed capping `max_iter` at the oracle's iteration count; that would not have worked, which was found
+by reading where `iter` is incremented.) Instead:
+
+* every adapter runs its foreign call in a worker thread with a wall-clock limit
+  (`solvers.call_with_timeout`, default 30 s, `L1FIT_SOLVE_TIMEOUT` to change it; the slowest legitimate
+  call is about 1.5 s, the `-O0 -fcheck=all` build on the 1000x250 instance). `ctypes` releases the GIL,
+  so the test thread stays alive; the stuck thread cannot be killed, so it is abandoned (daemon thread, it
+  keeps a core busy until the session ends) and `SolverHang` is raised, an ordinary test failure;
+* after `MAX_HANGS` (3) hangs an adapter fails every further call immediately, so a bug that hangs every
+  call costs about `3 x timeout` per adapter instead of `timeout x number of tests`;
+* the two tests that run subprocesses have their own limits (`test_fortran_interface.py`: 60 s,
+  `test_checked_build.py`: 300 s), reported as test failures;
+* `test_hang_guard.py` tests the guard, including a foreign call that blocks inside C (libc `sleep`).
+
+Measured on the three non-terminating mutants of the optimality decision (restriction never lifted,
+`START_PHASE2` or `STOP` acting like `CONTINUE`): each now fails after about 4 s with a 3 s limit, and
+the complete suite with such a mutant finishes in about 80 s (2643 failures) instead of never. Before the
+subprocess limits were added, the Fortran interface test alone kept the run alive indefinitely.
+The guard tests themselves were mutation-tested (5 mutations: 4 give an ordinary failure; removing the
+timeout from `join` makes the test of "returns quickly" hang, which is unavoidable).
 
 ## Known property of the legacy code
 

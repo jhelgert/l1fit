@@ -16,6 +16,7 @@ from pathlib import Path
 from legacy_cl1 import BUILD_DIR, ROOT
 
 PROGRAM = Path(__file__).resolve().parent / "fortran" / "check_cl1_interface.f90"
+RUN_TIMEOUT = 60  # seconds; the program normally needs a fraction of a second
 SOURCES = [ROOT / "src" / "l1_precision.f90", ROOT / "src" / "l1_calgo552.f90", PROGRAM]
 
 
@@ -51,7 +52,12 @@ def test_fortran_interface_checks():
     ]
     assert not warnings, "\n".join(warnings)
 
-    run = subprocess.run([str(exe)], capture_output=True, text=True)
+    try:
+        run = subprocess.run([str(exe)], capture_output=True, text=True, timeout=RUN_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise AssertionError(
+            f"the Fortran interface check did not finish within {RUN_TIMEOUT} s (probably an infinite loop in cl1)"
+        ) from None
     assert run.returncode == 0, run.stdout + run.stderr
     assert "all interface checks passed" in run.stdout
     assert "Fortran runtime warning" not in run.stderr, run.stderr
