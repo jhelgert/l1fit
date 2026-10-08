@@ -148,6 +148,14 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
 * **Sign flip of the entering column (`orient_entering_column`, 6 mutations)** - all killed: inverted
   condition, column never negated, label row or first row left out of the negation, gain not stored,
   negated gain stored.
+* **Artificial-pivot search (`pivot_on_restricted_row`, 10 mutations)** - 9 killed: both tie-break and
+  threshold directions, signed instead of absolute value, search one row short, pivot row not moved, row
+  count not decreased, stale pivot, `found` never reported, swap one column short (the label column; it
+  is also pinned by `PINNED_REDUNDANT_SEEDS`). One is an *equivalent mutant*, established by reading the
+  code: running the search in phase 1 as well. `iq` is only increased by `set_up_phase2_costs` (which
+  sets phase 2) and only decreased by the search itself, so it is 0 throughout phase 1 and the helper
+  returns immediately; the `iphase /= 1` guard at the call site is redundant but kept (it is the
+  original logic).
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**

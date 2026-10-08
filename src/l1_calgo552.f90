@@ -186,22 +186,7 @@ contains
 ! DETERMINE THE VECTOR TO LEAVE THE BASIS.
 !
               pivot_found = .false.
-              artificial_pivot: block
-                  if (iphase == 1 .or. iq == 0) exit artificial_pivot
-                  xmax = 0.0_wp
-                  find_artificial_pivot: do i = 1,iq
-                      tmp1 = abs(q(i,in))
-                      if (tmp1 <= xmax) cycle find_artificial_pivot
-                      xmax = tmp1
-                      iout = i
-                  end do find_artificial_pivot
-                  if (xmax <= toler) exit artificial_pivot
-                  call swap_rows(q, iq, iout, n2)
-                  iout = iq
-                  iq = iq - 1
-                  pivot = q(iout,in)
-                  pivot_found = .true.
-              end block artificial_pivot
+              if (iphase /= 1) call pivot_on_restricted_row(n, toler, in, q, iq, iout, pivot, pivot_found)
 
               if (.not. pivot_found) then
                   kk = 0
@@ -734,5 +719,55 @@ contains
          q(klm + 1, column) = gain
       end if
    end subroutine orient_entering_column
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine pivot_on_restricted_row(n, toler, entering_column, q, num_restricted_rows, leaving_row, &
+                                      pivot_value, found)
+      !! In the second phase, look for a pivot among the rows that hold a restricted basic variable.
+      !!
+      !! `set_up_phase2_costs` moved the `num_restricted_rows` rows with a basic variable of a
+      !! restricted sign to the top of the tableau. These variables must leave the basis first, so
+      !! if the entering column has a usable entry (larger in magnitude than `toler`) in one of those
+      !! rows, the row with the largest magnitude is taken as the pivot row (the first one wins a
+      !! tie): it is moved to the last of the restricted rows, which is then removed from the
+      !! restricted rows (`num_restricted_rows` is decreased by one).
+      !! If there is none, `found` is false and the ratio test has to choose the pivot row.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      real(wp), intent(in) :: toler
+         !! Tolerance: an entry that does not exceed it in magnitude is not a pivot
+      integer, intent(in) :: entering_column
+         !! Column of the entering variable
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau with at least `n+2` columns: rows are exchanged
+      integer, intent(inout) :: num_restricted_rows
+         !! Number of restricted rows at the top of the tableau
+      integer, intent(inout) :: leaving_row
+         !! Row of the leaving variable. On exit it is the pivot row if `found`. Otherwise it is the
+         !! last candidate that was examined, or unchanged if there are no restricted rows
+      real(wp), intent(inout) :: pivot_value
+         !! The pivot `q(leaving_row, entering_column)`; only set if `found`
+      logical, intent(out) :: found
+         !! True if a pivot among the restricted rows was found
+      real(wp) :: largest, magnitude
+      integer :: i
+
+      found = .false.
+      if (num_restricted_rows == 0) return
+      largest = 0.0_wp
+      find_largest: do i = 1, num_restricted_rows
+         magnitude = abs(q(i, entering_column))
+         if (magnitude <= largest) cycle find_largest
+         largest = magnitude
+         leaving_row = i
+      end do find_largest
+      if (largest <= toler) return
+      call swap_rows(q, num_restricted_rows, leaving_row, n + 2)
+      leaving_row = num_restricted_rows
+      num_restricted_rows = num_restricted_rows - 1
+      pivot_value = q(leaving_row, entering_column)
+      found = .true.
+   end subroutine pivot_on_restricted_row
 
 end module l1_calgo552
