@@ -41,6 +41,13 @@ module l1_calgo552
    integer, parameter :: L1_ALLOC_FAILED = 5
       !! Exit status: the internal workspace could not be allocated (nothing was computed)
 
+   integer, parameter :: ACTION_CONTINUE = 0
+      !! Optimality test: no optimum yet, continue with the next iteration of the current phase
+   integer, parameter :: ACTION_START_PHASE2 = 1
+      !! Optimality test: the first phase is complete, restart with the costs of the second phase
+   integer, parameter :: ACTION_STOP = 2
+      !! Optimality test: stop the simplex method (the exit status is returned as well)
+
 contains
 
    ! The 11-argument interface (down from 18 in the original) is kept for now, and the routine is
@@ -100,7 +107,7 @@ contains
 !     ..
 !     .. Local Scalars ..
       real(wp) :: pivot, xmax
-      integer :: iq, ii, in, iout, iphase, js, kforce
+      integer :: iq, ii, in, iout, iphase, js, kforce, action
       integer :: klm, klm1, klm2, max_iter, n1, n2, nk
       logical :: to_phase2, at_optimum, pivot_found
 !     ..
@@ -162,24 +169,16 @@ contains
 ! TEST FOR OPTIMALITY.
 !
               if (at_optimum) then
-                  if (kforce == 0) then
-                      if (iphase == 1) then
-                          if (q(klm1,n1) <= toler) then
-                              to_phase2 = .true.
-                              cycle simplex
-                          end if
-                          kode = L1_INFEASIBLE
-                      else
-                          kode = L1_OPTIMAL
-                      end if
-                      exit simplex
-                  end if
-                  if (iphase == 1 .and. q(klm1,n1) <= toler) then
+                  call decide_at_optimum(iphase, q(klm1,n1) <= toler, kforce, action, kode)
+                  select case (action)
+                  case (ACTION_START_PHASE2)
                       to_phase2 = .true.
                       cycle simplex
-                  end if
-                  kforce = 0
-                  cycle iterate
+                  case (ACTION_STOP)
+                      exit simplex
+                  case default
+                      cycle iterate
+                  end select
               end if
               call orient_entering_column(klm, in, xmax, q)
 !
@@ -675,6 +674,47 @@ contains
          q(klm + 1, column) = gain
       end if
    end subroutine orient_entering_column
+
+   subroutine decide_at_optimum(phase, phase1_objective_is_zero, force_original_variables, action, status)
+      !! Decide how to go on when no variable can enter the basis any more.
+      !!
+      !! * Not forcing the original variables: the current phase is complete. At the end of the
+      !!   first phase the problem is feasible if the phase 1 objective is zero (then the second
+      !!   phase starts), otherwise it is infeasible (stop). At the end of the second phase the
+      !!   solution is optimal (stop).
+      !! * Forcing the original variables: a first phase that is already complete starts the second
+      !!   phase; otherwise the restriction is lifted and the iterations continue with all variables.
+      integer, intent(in) :: phase
+         !! Current phase (1 or 2) of the simplex method
+      logical, intent(in) :: phase1_objective_is_zero
+         !! True if the objective of the first phase does not exceed the tolerance
+      integer, intent(inout) :: force_original_variables
+         !! 1 if only the original variables may enter the basis; reset to 0 when the restriction is
+         !! lifted
+      integer, intent(out) :: action
+         !! `ACTION_CONTINUE`, `ACTION_START_PHASE2` or `ACTION_STOP`
+      integer, intent(inout) :: status
+         !! Set to `L1_INFEASIBLE` or `L1_OPTIMAL` if `action == ACTION_STOP`; unchanged otherwise
+      if (force_original_variables == 0) then
+         if (phase == 1 .and. phase1_objective_is_zero) then
+            action = ACTION_START_PHASE2
+            return
+         end if
+         if (phase == 1) then
+            status = L1_INFEASIBLE
+         else
+            status = L1_OPTIMAL
+         end if
+         action = ACTION_STOP
+         return
+      end if
+      if (phase == 1 .and. phase1_objective_is_zero) then
+         action = ACTION_START_PHASE2
+         return
+      end if
+      force_original_variables = 0
+      action = ACTION_CONTINUE
+   end subroutine decide_at_optimum
 
    ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
    ! allow(too-many-arguments)

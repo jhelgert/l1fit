@@ -165,6 +165,17 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   `num_candidates /= 1` guard only skips an empty loop and the self-assignment `ratios(1) = ratios(1)`.
   One further "mutation" (`pivot_found = .true.` after the `exit simplex`) was invalid: it is
   unreachable code. The path itself is exercised by 140 corpus cases that end with `KODE = 2`.
+* **Optimality decision (`decide_at_optimum` and the `cl1` glue, 12 mutations)** - 9 killed with an ordinary
+  failure (`-x`): each of the branches of the decision table (phase-1 objective test inverted, restart never
+  taken in either branch, infeasible/optimal status swapped, phase 2 treated as phase 1), and the
+  objective condition passed by `cl1` (wrong cell, `<` for `<=`). **Three are non-terminating mutants** and
+  were only "detected" by a hang (a 25 s wall-clock limit in the experiment): the restriction on the original
+  variables is never lifted, and a `START_PHASE2` or `STOP` outcome acting like `CONTINUE`.
+  **Known limitation of the suite:** a bug that makes the solver loop forever hangs the test run instead of
+  failing it. A cheap fix is to pass the differential tests `max_iter = <oracle iterations> + margin` so a
+  looping candidate stops with `KODE = 3` and fails the comparison; it was not done because it changes
+  the inputs of the differential tests (a design decision). Never run non-terminating mutations without a
+  wall-clock limit.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
