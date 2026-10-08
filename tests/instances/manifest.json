@@ -1,0 +1,461 @@
+[
+  {
+    "name": "median_1d",
+    "description": "Median of 5 numbers (unique optimum x=3, error=107)",
+    "tags": [
+      "test"
+    ],
+    "k": 5,
+    "l": 0,
+    "m": 0,
+    "n": 1,
+    "ref_status": "optimal",
+    "ref_objective": 107.0,
+    "legacy_kode": 0,
+    "legacy_iterations": 1,
+    "legacy_error": 107.0,
+    "legacy_seconds": 0.0001
+  },
+  {
+    "name": "line_with_outlier",
+    "description": "Line fit, one outlier of size 10 (x=[1,2], error=10)",
+    "tags": [
+      "test"
+    ],
+    "k": 7,
+    "l": 0,
+    "m": 0,
+    "n": 2,
+    "ref_status": "optimal",
+    "ref_objective": 10.0,
+    "legacy_kode": 0,
+    "legacy_iterations": 4,
+    "legacy_error": 10.000000953674316,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "tiny_1x1",
+    "description": "Smallest problem k=n=1 (x=2, error=0)",
+    "tags": [
+      "test"
+    ],
+    "k": 1,
+    "l": 0,
+    "m": 0,
+    "n": 1,
+    "ref_status": "optimal",
+    "ref_objective": 0.0,
+    "legacy_kode": 0,
+    "legacy_iterations": 1,
+    "legacy_error": 0.0,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "square_exact",
+    "description": "Square nonsingular system: error = 0",
+    "tags": [
+      "test"
+    ],
+    "k": 4,
+    "l": 0,
+    "m": 0,
+    "n": 4,
+    "ref_status": "optimal",
+    "ref_objective": 0.0,
+    "legacy_kode": 0,
+    "legacy_iterations": 4,
+    "legacy_error": 0.0,
+    "legacy_seconds": 0.0001
+  },
+  {
+    "name": "underdetermined_2x5",
+    "description": "k<n: error = 0, x not unique",
+    "tags": [
+      "test"
+    ],
+    "k": 2,
+    "l": 0,
+    "m": 0,
+    "n": 5,
+    "ref_status": "optimal",
+    "ref_objective": 0.0,
+    "legacy_kode": 0,
+    "legacy_iterations": 2,
+    "legacy_error": 0.0,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "zero_rhs",
+    "description": "b = 0: x = 0, error = 0",
+    "tags": [
+      "test"
+    ],
+    "k": 12,
+    "l": 0,
+    "m": 0,
+    "n": 3,
+    "ref_status": "optimal",
+    "ref_objective": 0.0,
+    "legacy_kode": 0,
+    "legacy_iterations": 3,
+    "legacy_error": 0.0,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "degenerate_duplicate_rows",
+    "description": "Duplicated / scaled rows (degenerate vertices)",
+    "tags": [
+      "test"
+    ],
+    "k": 12,
+    "l": 0,
+    "m": 0,
+    "n": 3,
+    "ref_status": "optimal",
+    "ref_objective": 4.354250170832096,
+    "legacy_kode": 0,
+    "legacy_iterations": 4,
+    "legacy_error": 4.354250431060791,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "rand_20x3",
+    "description": "Heavy-tailed noise, unconstrained",
+    "tags": [
+      "test"
+    ],
+    "k": 20,
+    "l": 0,
+    "m": 0,
+    "n": 3,
+    "ref_status": "optimal",
+    "ref_objective": 29.23179955612544,
+    "legacy_kode": 0,
+    "legacy_iterations": 6,
+    "legacy_error": 29.23179817199707,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "rand_eq_30x4_l2",
+    "description": "2 equality constraints",
+    "tags": [
+      "test"
+    ],
+    "k": 30,
+    "l": 2,
+    "m": 0,
+    "n": 4,
+    "ref_status": "optimal",
+    "ref_objective": 53.7278553076225,
+    "legacy_kode": 0,
+    "legacy_iterations": 5,
+    "legacy_error": 53.72785568237305,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "rand_ineq_30x4_m5",
+    "description": "5 inequality constraints",
+    "tags": [
+      "test"
+    ],
+    "k": 30,
+    "l": 0,
+    "m": 5,
+    "n": 4,
+    "ref_status": "optimal",
+    "ref_objective": 36.12057948455343,
+    "legacy_kode": 0,
+    "legacy_iterations": 8,
+    "legacy_error": 36.12057876586914,
+    "legacy_seconds": 0.0001
+  },
+  {
+    "name": "rand_eq_ineq_60x6_l2_m8",
+    "description": "Equality + inequality constraints",
+    "tags": [
+      "test"
+    ],
+    "k": 60,
+    "l": 2,
+    "m": 8,
+    "n": 6,
+    "ref_status": "optimal",
+    "ref_objective": 72.85863086056023,
+    "legacy_kode": 0,
+    "legacy_iterations": 19,
+    "legacy_error": 72.85863494873047,
+    "legacy_seconds": 0.0001
+  },
+  {
+    "name": "rand_gauss_40x5",
+    "description": "Gaussian noise, unconstrained",
+    "tags": [
+      "test"
+    ],
+    "k": 40,
+    "l": 0,
+    "m": 0,
+    "n": 5,
+    "ref_status": "optimal",
+    "ref_objective": 33.146023005783874,
+    "legacy_kode": 0,
+    "legacy_iterations": 11,
+    "legacy_error": 33.14602279663086,
+    "legacy_seconds": 0.0001
+  },
+  {
+    "name": "eq_fully_determined",
+    "description": "l = n equality rows fix x",
+    "tags": [
+      "test"
+    ],
+    "k": 10,
+    "l": 3,
+    "m": 0,
+    "n": 3,
+    "ref_status": "optimal",
+    "ref_objective": 289.2575773562656,
+    "legacy_kode": 0,
+    "legacy_iterations": 3,
+    "legacy_error": 289.2575988769531,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "infeasible_bounds",
+    "description": "x>=2 and x<=1 -> KODE=1",
+    "tags": [
+      "test"
+    ],
+    "k": 3,
+    "l": 0,
+    "m": 2,
+    "n": 1,
+    "ref_status": "infeasible",
+    "ref_objective": null,
+    "legacy_kode": 1,
+    "legacy_iterations": 1,
+    "legacy_error": 2.0,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "infeasible_equalities",
+    "description": "Contradictory equalities -> KODE=1",
+    "tags": [
+      "test"
+    ],
+    "k": 3,
+    "l": 2,
+    "m": 0,
+    "n": 2,
+    "ref_status": "infeasible",
+    "ref_objective": null,
+    "legacy_kode": 1,
+    "legacy_iterations": 1,
+    "legacy_error": 4.0,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "iteration_limit",
+    "description": "max_iter=1 -> KODE=3",
+    "tags": [
+      "test"
+    ],
+    "k": 30,
+    "l": 0,
+    "m": 0,
+    "n": 4,
+    "ref_status": "optimal",
+    "ref_objective": 30.69254450489866,
+    "legacy_kode": 3,
+    "legacy_iterations": 1,
+    "legacy_error": 32.36594772338867,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "kode1_x_signs",
+    "description": "x1<=0, x2 free, x3>=0 (true optimum violates x3>=0)",
+    "tags": [
+      "test"
+    ],
+    "k": 25,
+    "l": 0,
+    "m": 0,
+    "n": 3,
+    "ref_status": "optimal",
+    "ref_objective": 50.517675296109864,
+    "legacy_kode": 0,
+    "legacy_iterations": 4,
+    "legacy_error": 50.51767349243164,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "kode1_residual_signs",
+    "description": "b-Ax >=0 for 8 rows, <=0 for 4 rows",
+    "tags": [
+      "test"
+    ],
+    "k": 25,
+    "l": 0,
+    "m": 0,
+    "n": 3,
+    "ref_status": "optimal",
+    "ref_objective": 31.308661282084433,
+    "legacy_kode": 0,
+    "legacy_iterations": 5,
+    "legacy_error": 31.30866050720215,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "kode1_signs_and_constraints",
+    "description": "KODE=1 combined with eq+ineq rows",
+    "tags": [
+      "test"
+    ],
+    "k": 40,
+    "l": 1,
+    "m": 4,
+    "n": 4,
+    "ref_status": "optimal",
+    "ref_objective": 53.96986036749155,
+    "legacy_kode": 0,
+    "legacy_iterations": 9,
+    "legacy_error": 53.9698600769043,
+    "legacy_seconds": 0.0
+  },
+  {
+    "name": "rand_200x10",
+    "description": "Mid-size unconstrained",
+    "tags": [
+      "test"
+    ],
+    "k": 200,
+    "l": 0,
+    "m": 0,
+    "n": 10,
+    "ref_status": "optimal",
+    "ref_objective": 228.28397551682994,
+    "legacy_kode": 0,
+    "legacy_iterations": 37,
+    "legacy_error": 228.2839813232422,
+    "legacy_seconds": 0.0002
+  },
+  {
+    "name": "rand_300x15_l3_m20",
+    "description": "Mid-size, 3 eq + 20 ineq",
+    "tags": [
+      "test"
+    ],
+    "k": 300,
+    "l": 3,
+    "m": 20,
+    "n": 15,
+    "ref_status": "optimal",
+    "ref_objective": 444.623675063938,
+    "legacy_kode": 0,
+    "legacy_iterations": 54,
+    "legacy_error": 444.6236572265625,
+    "legacy_seconds": 0.0004
+  },
+  {
+    "name": "bench_500x10",
+    "description": "Benchmark: 500 x 10",
+    "tags": [
+      "benchmark"
+    ],
+    "k": 500,
+    "l": 0,
+    "m": 0,
+    "n": 10,
+    "ref_status": "optimal",
+    "ref_objective": 681.1176530560741,
+    "legacy_kode": 0,
+    "legacy_iterations": 54,
+    "legacy_error": 681.11767578125,
+    "legacy_seconds": 0.0005
+  },
+  {
+    "name": "bench_2000x20",
+    "description": "Benchmark: 2000 x 20",
+    "tags": [
+      "benchmark"
+    ],
+    "k": 2000,
+    "l": 0,
+    "m": 0,
+    "n": 20,
+    "ref_status": "optimal",
+    "ref_objective": 2681.869205742244,
+    "legacy_kode": 0,
+    "legacy_iterations": 115,
+    "legacy_error": 2681.869140625,
+    "legacy_seconds": 0.0091
+  },
+  {
+    "name": "bench_2000x20_l3_m10",
+    "description": "Benchmark: 2000 x 20, 3 eq, 10 ineq",
+    "tags": [
+      "benchmark"
+    ],
+    "k": 2000,
+    "l": 3,
+    "m": 10,
+    "n": 20,
+    "ref_status": "optimal",
+    "ref_objective": 2528.6352061775756,
+    "legacy_kode": 0,
+    "legacy_iterations": 117,
+    "legacy_error": 2528.63525390625,
+    "legacy_seconds": 0.0102
+  },
+  {
+    "name": "bench_300x100",
+    "description": "Benchmark: 300 x 100 (many columns)",
+    "tags": [
+      "benchmark"
+    ],
+    "k": 300,
+    "l": 0,
+    "m": 0,
+    "n": 100,
+    "ref_status": "optimal",
+    "ref_objective": 321.74201614478244,
+    "legacy_kode": 0,
+    "legacy_iterations": 358,
+    "legacy_error": 321.7420654296875,
+    "legacy_seconds": 0.0078
+  },
+  {
+    "name": "bench_5000x30",
+    "description": "Benchmark: 5000 x 30",
+    "tags": [
+      "benchmark"
+    ],
+    "k": 5000,
+    "l": 0,
+    "m": 0,
+    "n": 30,
+    "ref_status": "optimal",
+    "ref_objective": 7001.618026532865,
+    "legacy_kode": 0,
+    "legacy_iterations": 228,
+    "legacy_error": 7001.6181640625,
+    "legacy_seconds": 0.0599
+  },
+  {
+    "name": "bench_cvxpy_script_1000x250",
+    "description": "Sizes/data of tests/test_cvxpy.py (1000x250, 10 eq, 200 ineq)",
+    "tags": [
+      "benchmark"
+    ],
+    "k": 1000,
+    "l": 10,
+    "m": 200,
+    "n": 250,
+    "ref_status": "optimal",
+    "ref_objective": 946.5535402160803,
+    "legacy_kode": 0,
+    "legacy_iterations": 936,
+    "legacy_error": 946.55322265625,
+    "legacy_seconds": 0.1604
+  }
+]

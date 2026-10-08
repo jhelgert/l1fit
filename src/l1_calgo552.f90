@@ -1,0 +1,469 @@
+!--**--CH751--552--C:ID--1:8:1999
+module l1_calgo552
+   !! L1 solution of linear systems with linear constraints (ACM TOMS algorithm 552).
+   !!
+   !! Uses a modification of the simplex method of linear programming (I. Barrodale and
+   !! F. D. K. Roberts, ACM Transactions on Mathematical Software, algorithm 552) to calculate an
+   !! L1 solution of a `k` by `n` system of linear equations
+   !!
+   !!     A x = b
+   !!
+   !! subject to `l` linear equality constraints `C x = d` and `m` linear inequality constraints
+   !! `E x <= f`, i.e. it solves
+   !!
+   !!     minimise ||A x - b||_1   subject to   C x = d,   E x <= f.
+   !!
+   !! All data are passed in one matrix `q` that is destroyed by the solver:
+   !!
+   !!     q(1:k+l+m, 1:n+1) = [ A  b ]
+   !!                         [ C  d ]
+   !!                         [ E  f ]
+   !!
+   !! The last row and the last column of `q(1:k+l+m+2, 1:n+2)` are workspace.
+   use l1_precision, only: wp, dp
+   implicit none (type, external)
+   private
+
+   public :: cl1
+   public :: L1_OPTIMAL, L1_INFEASIBLE, L1_ROUNDING_ERRORS, L1_MAX_ITERATIONS
+   public :: L1_INVALID_INPUT, L1_ALLOC_FAILED
+
+   integer, parameter :: L1_OPTIMAL = 0
+      !! Exit status: optimal solution found
+   integer, parameter :: L1_INFEASIBLE = 1
+      !! Exit status: no feasible solution to the constraints
+   integer, parameter :: L1_ROUNDING_ERRORS = 2
+      !! Exit status: calculations terminated prematurely due to rounding errors
+   integer, parameter :: L1_MAX_ITERATIONS = 3
+      !! Exit status: maximum number of iterations reached
+   integer, parameter :: L1_INVALID_INPUT = 4
+      !! Exit status: invalid dimensions or arrays that are too small (nothing was computed)
+   integer, parameter :: L1_ALLOC_FAILED = 5
+      !! Exit status: the internal workspace could not be allocated (nothing was computed)
+
+contains
+
+   ! The 11-argument interface (down from 18 in the original) is kept for now, and the routine is
+   ! still one monolithic simplex loop; splitting it into procedures is planned (structure layer).
+   ! allow(too-many-arguments, too-complex)
+   subroutine cl1(k, l, m, n, q, kode, toler, iter, x, res, error)
+      !! Solve the L1 problem described in the module documentation.
+      !!
+      !! Arrays may be larger than required; only the leading parts described below are used.
+      !! `q`, `x` and `res` are declared `contiguous`: a non-contiguous actual argument (for
+      !! example a strided section) is copied in and out by the compiler.
+      !! If an argument is invalid `kode` is set to `L1_INVALID_INPUT` and no array is touched.
+      integer, intent(in) :: k
+         !! Number of rows of the matrix `A` (`k >= 1`)
+      integer, intent(in) :: l
+         !! Number of rows of the matrix `C` (`l >= 0`)
+      integer, intent(in) :: m
+         !! Number of rows of the matrix `E` (`m >= 0`)
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E` (`n >= 1`)
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Problem data on entry (layout in the module documentation, at least `k+l+m+2` rows and
+         !! `n+2` columns); destroyed by the solver
+      integer, intent(inout) :: kode
+         !! On entry normally `0`. If set to `1`, sign restrictions are imposed implicitly instead of
+         !! through explicit rows of `E x <= f`: see `x` and `res`.
+         !! On exit one of `L1_OPTIMAL`, `L1_INFEASIBLE`, `L1_ROUNDING_ERRORS`, `L1_MAX_ITERATIONS`,
+         !! `L1_INVALID_INPUT`, `L1_ALLOC_FAILED`
+      real(wp), intent(in) :: toler
+         !! Small positive tolerance: the solver cannot distinguish zero from any quantity whose
+         !! magnitude does not exceed `toler`, in particular it does not pivot on such a number.
+         !! Empirical evidence suggests `toler = 10**(-d*2/3)` where `d` is the number of decimal
+         !! digits of accuracy available
+      integer, intent(inout) :: iter
+         !! On entry the maximum number of iterations allowed (suggested: `10*(k+l+m)`);
+         !! on exit the number of simplex iterations performed
+      real(wp), contiguous, intent(inout) :: x(:)
+         !! On exit (`size(x) >= n`) a solution of the L1 problem. If `kode = 1` on entry, `x(j)`
+         !! in {-1, 0, 1} on entry restricts the j-th variable to be <= 0, unrestricted or >= 0
+      real(wp), contiguous, intent(inout) :: res(:)
+         !! On exit (`size(res) >= k+l+m`) the residuals `b - A x` in the first `k` components,
+         !! `d - C x` in the next `l` (these are 0) and `f - E x` in the next `m`.
+         !! If `kode = 1` on entry, `res(i)` in {-1, 0, 1} for `i <= k` restricts the residual of the
+         !! i-th equation to be <= 0, unrestricted or >= 0. Also used as scratch space
+      real(wp), intent(out) :: error
+         !! On exit the minimum sum of absolute values of the residuals `b - A x`
+
+!     .. Workspace ..
+      real(wp), allocatable :: cu(:, :)
+         !! Cost coefficients, one row for each of the two signs of a variable
+      integer, allocatable :: iu(:, :)
+         !! Restriction flags, one row for each of the two signs of a variable
+      integer, allocatable :: s(:)
+         !! Row indices of the candidates of the ratio test
+      character(len=256) :: alloc_msg
+      integer :: alloc_stat
+!     ..
+!     .. Local Scalars ..
+      real(dp) :: sum
+      real(wp) :: cuv, pivot, sn, tpivot, xmax, xmin, tmp1, zu, zv
+      integer :: i, iq, ii, iimn, iineg, in, iout, iphase, j, jmn, jpn, js, kforce, kk
+      integer :: klm, klm1, klm2, max_iter, n1, n2, nk, nk1, nkl, nkl1, nklm
+      logical :: to_phase2, at_optimum, pivot_found
+!     ..
+! CHECK THE ARGUMENTS BEFORE ANYTHING IS READ OR WRITTEN.
+      if (k < 1 .or. l < 0 .or. m < 0 .or. n < 1 .or. &
+          size(q, 1) < k + l + m + 2 .or. size(q, 2) < n + 2 .or. &
+          size(x) < n .or. size(res) < k + l + m) then
+         kode = L1_INVALID_INPUT
+         iter = 0
+         error = 0.0_wp
+         return
+      end if
+! ALLOCATE THE WORKSPACE.
+      allocate (cu(2, n + k + l + m), stat=alloc_stat, errmsg=alloc_msg)
+      if (alloc_stat == 0) allocate (iu(2, n + k + l + m), stat=alloc_stat, errmsg=alloc_msg)
+      if (alloc_stat == 0) allocate (s(k + l + m), stat=alloc_stat, errmsg=alloc_msg)
+      if (alloc_stat /= 0) then
+         kode = L1_ALLOC_FAILED
+         iter = 0
+         error = 0.0_wp
+         return
+      end if
+!
+! INITIALIZATION.
+!
+      max_iter = iter
+      n1 = n + 1
+      n2 = n + 2
+      nk = n + k
+      nk1 = nk + 1
+      nkl = nk + l
+      nkl1 = nkl + 1
+      klm = k + l + m
+      klm1 = klm + 1
+      klm2 = klm + 2
+      nklm = n + klm
+      kforce = 1
+      iter = 0
+      js = 1
+      iq = 0
+! SET UP LABELS IN Q.
+      do j = 1,n
+          q(klm2,j) = real(j, wp)
+      end do
+      label_rows: do i = 1,klm
+          q(i,n2) = real(n + i, wp)
+          if (q(i,n1) >= 0.0_wp) cycle label_rows
+          do j = 1,n2
+              q(i,j) = -q(i,j)
+          end do
+      end do label_rows
+! SET UP PHASE 1 COSTS.
+      iphase = 2
+      do j = 1,nklm
+          cu(1,j) = 0.0_wp
+          cu(2,j) = 0.0_wp
+          iu(1,j) = 0
+          iu(2,j) = 0
+      end do
+      if (l /= 0) then
+          do j = nk1,nkl
+              cu(1,j) = 1.0_wp
+              cu(2,j) = 1.0_wp
+              iu(1,j) = 1
+              iu(2,j) = 1
+          end do
+          iphase = 1
+      end if
+      if (m /= 0) then
+          do j = nkl1,nklm
+              cu(2,j) = 1.0_wp
+              iu(2,j) = 1
+              jmn = j - n
+              if (q(jmn,n2) < 0.0_wp) iphase = 1
+          end do
+      end if
+      if (kode /= 0) then
+! NONNEGATIVITY RESTRICTIONS ON X (SIGN IN X(J)) AND ON THE RESIDUALS (SIGN IN RES(J)).
+          do j = 1,n
+              if (x(j) < 0.0_wp) then
+                  cu(1,j) = 1.0_wp
+                  iu(1,j) = 1
+              else if (x(j) /= 0.0_wp) then
+                  cu(2,j) = 1.0_wp
+                  iu(2,j) = 1
+              end if
+          end do
+          do j = 1,k
+              jpn = j + n
+              if (res(j) < 0.0_wp) then
+                  cu(1,jpn) = 1.0_wp
+                  iu(1,jpn) = 1
+                  if (q(j,n2) > 0.0_wp) iphase = 1
+              else if (res(j) /= 0.0_wp) then
+                  cu(2,jpn) = 1.0_wp
+                  iu(2,jpn) = 1
+                  if (q(j,n2) < 0.0_wp) iphase = 1
+              end if
+          end do
+      end if
+!
+! MAIN LOOP.  EACH PASS (RE)STARTS WITH THE PHASE 2 COSTS (ONLY WHEN TO_PHASE2 IS SET) AND
+! THE MARGINAL COSTS, THEN PIVOTS UNTIL THE CURRENT PHASE IS OPTIMAL.
+!
+      to_phase2 = (iphase == 2)
+      simplex: do
+          if (to_phase2) then
+! SET UP PHASE 2 COSTS.
+              iphase = 2
+              do j = 1,nklm
+                  cu(1,j) = 0.0_wp
+                  cu(2,j) = 0.0_wp
+              end do
+              do j = n1,nk
+                  cu(1,j) = 1.0_wp
+                  cu(2,j) = 1.0_wp
+              end do
+              phase2_costs: do i = 1,klm
+                  ii = int(q(i,n2))
+                  if (ii > 0) then
+                      if (iu(1,ii) == 0) cycle phase2_costs
+                      cu(1,ii) = 0.0_wp
+                  else
+                      ii = -ii
+                      if (iu(2,ii) == 0) cycle phase2_costs
+                      cu(2,ii) = 0.0_wp
+                  end if
+                  iq = iq + 1
+                  do j = 1,n2
+                      tmp1 = q(iq,j)
+                      q(iq,j) = q(i,j)
+                      q(i,j) = tmp1
+                  end do
+              end do phase2_costs
+          end if
+! COMPUTE THE MARGINAL COSTS.
+          do j = js,n1
+              sum = 0.0_dp
+              do i = 1,klm
+                  ii = int(q(i,n2))
+                  if (ii < 0) then
+                      iineg = -ii
+                      tmp1 = cu(2,iineg)
+                  else
+                      tmp1 = cu(1,ii)
+                  end if
+                  sum = sum + real(q(i,j), dp)*real(tmp1, dp)
+              end do
+              q(klm1,j) = real(sum, wp)
+          end do
+          do j = js,n
+              ii = int(q(klm2,j))
+              if (ii < 0) then
+                  iineg = -ii
+                  tmp1 = cu(2,iineg)
+              else
+                  tmp1 = cu(1,ii)
+              end if
+              q(klm1,j) = q(klm1,j) - tmp1
+          end do
+
+          iterate: do
+! DETERMINE THE VECTOR TO ENTER THE BASIS.
+              xmax = 0.0_wp
+              at_optimum = (js > n)
+              if (.not. at_optimum) then
+                  entering_candidates: do j = js,n
+                      zu = q(klm1,j)
+                      ii = int(q(klm2,j))
+                      if (ii > 0) then
+                          zv = -zu - cu(1,ii) - cu(2,ii)
+                      else
+                          ii = -ii
+                          zv = zu
+                          zu = -zu - cu(1,ii) - cu(2,ii)
+                      end if
+                      if (kforce == 1 .and. ii > n) cycle entering_candidates
+                      candidate_u: block
+                          if (iu(1,ii) == 1) exit candidate_u
+                          if (zu <= xmax) exit candidate_u
+                          xmax = zu
+                          in = j
+                      end block candidate_u
+                      if (iu(2,ii) == 1) cycle entering_candidates
+                      if (zv <= xmax) cycle entering_candidates
+                      xmax = zv
+                      in = j
+                  end do entering_candidates
+                  at_optimum = (xmax <= toler)
+              end if
+!
+! TEST FOR OPTIMALITY.
+!
+              if (at_optimum) then
+                  if (kforce == 0) then
+                      if (iphase == 1) then
+                          if (q(klm1,n1) <= toler) then
+                              to_phase2 = .true.
+                              cycle simplex
+                          end if
+                          kode = L1_INFEASIBLE
+                      else
+                          kode = L1_OPTIMAL
+                      end if
+                      exit simplex
+                  end if
+                  if (iphase == 1 .and. q(klm1,n1) <= toler) then
+                      to_phase2 = .true.
+                      cycle simplex
+                  end if
+                  kforce = 0
+                  cycle iterate
+              end if
+              if (q(klm1,in) /= xmax) then
+                  do i = 1,klm2
+                      q(i,in) = -q(i,in)
+                  end do
+                  q(klm1,in) = xmax
+              end if
+!
+! DETERMINE THE VECTOR TO LEAVE THE BASIS.
+!
+              pivot_found = .false.
+              artificial_pivot: block
+                  if (iphase == 1 .or. iq == 0) exit artificial_pivot
+                  xmax = 0.0_wp
+                  find_artificial_pivot: do i = 1,iq
+                      tmp1 = abs(q(i,in))
+                      if (tmp1 <= xmax) cycle find_artificial_pivot
+                      xmax = tmp1
+                      iout = i
+                  end do find_artificial_pivot
+                  if (xmax <= toler) exit artificial_pivot
+                  do j = 1,n2
+                      tmp1 = q(iq,j)
+                      q(iq,j) = q(iout,j)
+                      q(iout,j) = tmp1
+                  end do
+                  iout = iq
+                  iq = iq - 1
+                  pivot = q(iout,in)
+                  pivot_found = .true.
+              end block artificial_pivot
+
+              if (.not. pivot_found) then
+                  kk = 0
+                  ratio_candidates: do i = 1,klm
+                      tmp1 = q(i,in)
+                      if (tmp1 <= toler) cycle ratio_candidates
+                      kk = kk + 1
+                      res(kk) = q(i,n1)/tmp1
+                      s(kk) = i
+                  end do ratio_candidates
+! RATIO TEST: PICK THE SMALLEST RATIO, OR BYPASS THE VERTEX AND PICK AGAIN.
+                  bypass: do
+                      if (kk <= 0) then
+                          kode = L1_ROUNDING_ERRORS
+                          exit simplex
+                      end if
+                      xmin = res(1)
+                      iout = s(1)
+                      j = 1
+                      if (kk /= 1) then
+                          smallest_ratio: do i = 2,kk
+                              if (res(i) >= xmin) cycle smallest_ratio
+                              j = i
+                              xmin = res(i)
+                              iout = s(i)
+                          end do smallest_ratio
+                          res(j) = res(kk)
+                          s(j) = s(kk)
+                      end if
+                      kk = kk - 1
+                      pivot = q(iout,in)
+                      ii = int(q(iout,n2))
+                      if (iphase /= 1) then
+                          if (ii < 0) then
+                              iineg = -ii
+                              if (iu(1,iineg) == 1) exit bypass
+                          else
+                              if (iu(2,ii) == 1) exit bypass
+                          end if
+                      end if
+                      ii = abs(ii)
+                      cuv = cu(1,ii) + cu(2,ii)
+                      if (q(klm1,in)-pivot*cuv <= toler) exit bypass
+! BYPASS INTERMEDIATE VERTICES.
+                      do j = js,n1
+                          tmp1 = q(iout,j)
+                          q(klm1,j) = q(klm1,j) - tmp1*cuv
+                          q(iout,j) = -tmp1
+                      end do
+                      q(iout,n2) = -q(iout,n2)
+                  end do bypass
+              end if
+!
+! GAUSS-JORDAN ELIMINATION.
+!
+              if (iter >= max_iter) then
+                  kode = L1_MAX_ITERATIONS
+                  exit simplex
+              end if
+              iter = iter + 1
+              do j = js,n1
+                  if (j /= in) q(iout,j) = q(iout,j)/pivot
+              end do
+! NOTE: the original paper suggests replacing the next loop nest by a helper that adds a multiple
+! of one column to another, for compilers that can pass a column of a 2-D array to a 1-D dummy
+! argument; see legacy/CALGO552.f.
+              eliminate_columns: do j = js,n1
+                  if (j == in) cycle eliminate_columns
+                  tmp1 = -q(iout,j)
+                  do i = 1,klm1
+                      if (i /= iout) q(i,j) = q(i,j) + tmp1*q(i,in)
+                  end do
+              end do eliminate_columns
+              tpivot = -pivot
+              do i = 1,klm1
+                  if (i /= iout) q(i,in) = q(i,in)/tpivot
+              end do
+              q(iout,in) = 1.0_wp/pivot
+              tmp1 = q(iout,n2)
+              q(iout,n2) = q(klm2,in)
+              q(klm2,in) = tmp1
+              ii = int(abs(tmp1))
+              if (iu(1,ii) == 0 .or. iu(2,ii) == 0) cycle iterate
+              do i = 1,klm2
+                  tmp1 = q(i,in)
+                  q(i,in) = q(i,js)
+                  q(i,js) = tmp1
+              end do
+              js = js + 1
+          end do iterate
+      end do simplex
+!
+! PREPARE OUTPUT.
+!
+      sum = 0.0_dp
+      do j = 1,n
+          x(j) = 0.0_wp
+      end do
+      do i = 1,klm
+          res(i) = 0.0_wp
+      end do
+      do i = 1,klm
+          ii = int(q(i,n2))
+          if (ii > 0) then
+              sn = 1.0_wp
+          else
+              ii = -ii
+              sn = -1.0_wp
+          end if
+          if (ii <= n) then
+              x(ii) = sn*q(i,n1)
+          else
+              iimn = ii - n
+              res(iimn) = sn*q(i,n1)
+              if (ii >= n1 .and. ii <= nk) sum = sum + real(q(i,n1), dp)
+          end if
+      end do
+      error = real(sum, wp)
+
+   end subroutine cl1
+
+end module l1_calgo552

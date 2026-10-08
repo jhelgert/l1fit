@@ -1,0 +1,34 @@
+[check]
+preview = true
+line-length = 132
+extend-exclude = ["legacy"]  # frozen reference implementations (test oracles): never lint or edit
+target-std = "f2018"   # options: f95, f2003, f2008, f2018 (default), f2023; use "f2008" if the project is pinned to F2008
+# Start from the default set plus the rules that implement the style guide
+extend-select = [
+  "C021", # no-real-suffix                  -> every real literal needs _wp
+  "C022", # implicit-real-kind              -> real(wp), never bare `real`
+  "C031", # magic-number-in-array-size      -> named constants
+  "C032", # magic-io-unit                   -> output_unit / newunit
+  "C043", # missing-action-specifier
+  "C132", # default-public-accessibility    -> private by default
+  "C142", # exit-or-cycle-in-unlabelled-loop
+  "C183", # stat-without-message
+  "MOD001", # double-precision              -> real(wp)
+  "MOD002", # double-precision-literal      -> 1.0e-6_wp, not 1.0d-6
+  "MOD031", # include-statement
+  "PORT001", # non-portable-io-unit
+  "S082", # multiple-statements-per-line
+  "S102", "S103", "S104",   # whitespace layout
+  "S201", # superfluous-implicit-none
+  "S211", # multiple-modules (one module per file)
+  "S212", # program-with-module
+  "S221", # function-missing-result
+  "S251", "S252", "S253", "S254", "S255", # useless return / superfluous else after return|cycle|exit|stop
+  "S262", "S263",           # array-declaration style
+  "S902", # too-many-arguments (style guide: <= 6)
+  "S901", # too-complex (cyclomatic complexity; helps enforce "avoid deep nesting")
+]
+
+[check.complexity]
+max-args = 6          # style guide: public procedures take <= 6 arguments
+# max-complexity = 10 # tune to the code base; check `fortitude config check.complexity`
