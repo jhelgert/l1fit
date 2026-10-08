@@ -100,8 +100,8 @@ contains
 !     ..
 !     .. Local Scalars ..
       real(wp) :: cuv, pivot, tpivot, xmax, xmin, tmp1, zu, zv
-      integer :: i, iq, ii, iineg, in, iout, iphase, j, jpn, js, kforce, kk
-      integer :: klm, klm1, klm2, max_iter, n1, n2, nk, nk1, nkl, nkl1, nklm
+      integer :: i, iq, ii, iineg, in, iout, iphase, j, js, kforce, kk
+      integer :: klm, klm1, klm2, max_iter, n1, n2, nk
       logical :: to_phase2, at_optimum, pivot_found
 !     ..
 ! CHECK THE ARGUMENTS BEFORE ANYTHING IS READ OR WRITTEN.
@@ -130,56 +130,18 @@ contains
       n1 = n + 1
       n2 = n + 2
       nk = n + k
-      nk1 = nk + 1
-      nkl = nk + l
-      nkl1 = nkl + 1
       klm = k + l + m
       klm1 = klm + 1
       klm2 = klm + 2
-      nklm = n + klm
       kforce = 1
       iter = 0
       js = 1
       iq = 0
       call set_up_labels(n, klm, q)
 ! SET UP PHASE 1 COSTS.
-      iphase = 2
-      cu = 0.0_wp
-      iu = 0
-      if (l /= 0) then
-          cu(:,nk1:nkl) = 1.0_wp
-          iu(:,nk1:nkl) = 1
-          iphase = 1
-      end if
-      if (m /= 0) then
-          cu(2,nkl1:nklm) = 1.0_wp
-          iu(2,nkl1:nklm) = 1
-          if (any(q(nkl1-n:nklm-n,n2) < 0.0_wp)) iphase = 1
-      end if
-      if (kode /= 0) then
+      call set_up_phase1_costs(n, k, l, m, q, cu, iu, iphase)
 ! NONNEGATIVITY RESTRICTIONS ON X (SIGN IN X(J)) AND ON THE RESIDUALS (SIGN IN RES(J)).
-          do j = 1,n
-              if (x(j) < 0.0_wp) then
-                  cu(1,j) = 1.0_wp
-                  iu(1,j) = 1
-              else if (x(j) /= 0.0_wp) then
-                  cu(2,j) = 1.0_wp
-                  iu(2,j) = 1
-              end if
-          end do
-          do j = 1,k
-              jpn = j + n
-              if (res(j) < 0.0_wp) then
-                  cu(1,jpn) = 1.0_wp
-                  iu(1,jpn) = 1
-                  if (q(j,n2) > 0.0_wp) iphase = 1
-              else if (res(j) /= 0.0_wp) then
-                  cu(2,jpn) = 1.0_wp
-                  iu(2,jpn) = 1
-                  if (q(j,n2) < 0.0_wp) iphase = 1
-              end if
-          end do
-      end if
+      if (kode /= 0) call apply_sign_restrictions(n, k, x, res, q, cu, iu, iphase)
 !
 ! MAIN LOOP.  EACH PASS (RE)STARTS WITH THE PHASE 2 COSTS (ONLY WHEN TO_PHASE2 IS SET) AND
 ! THE MARGINAL COSTS, THEN PIVOTS UNTIL THE CURRENT PHASE IS OPTIMAL.
@@ -545,5 +507,105 @@ contains
          q(klm + 1, j) = q(klm + 1, j) - variable_cost
       end do
    end subroutine compute_marginal_costs
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine set_up_phase1_costs(n, k, l, m, q, costs, restricted, phase)
+      !! Set up the costs and the restrictions of the first phase of the simplex method.
+      !!
+      !! The variables of the linear program are numbered `1:n` for the unknowns `x`, `n+1:n+k` for
+      !! the residuals of the `k` equations `A x = b`, `n+k+1:n+k+l` for the artificial variables of
+      !! the `l` equality constraints and `n+k+l+1:n+k+l+m` for the slacks of the `m` inequality
+      !! constraints. Each variable has two signs: `costs(1,j)` and `restricted(1,j)` belong to the
+      !! negative sign, `costs(2,j)` and `restricted(2,j)` to the positive sign. A restricted sign
+      !! (flag 1) is not allowed to enter the basis. The artificial variables of the equality
+      !! constraints carry a cost of 1 for both signs and are restricted; the slacks of the
+      !! inequality constraints carry a cost of 1 and are restricted for the positive sign only.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: k
+         !! Number of rows of the matrix `A`
+      integer, intent(in) :: l
+         !! Number of rows of the matrix `C`
+      integer, intent(in) :: m
+         !! Number of rows of the matrix `E`
+      real(wp), contiguous, intent(in) :: q(:, :)
+         !! Simplex tableau with the labels set (see `set_up_labels`)
+      real(wp), contiguous, intent(out) :: costs(:, :)
+         !! Phase 1 costs of the `n+k+l+m` variables, one row for each sign
+      integer, contiguous, intent(out) :: restricted(:, :)
+         !! Restriction flags of the `n+k+l+m` variables, one row for each sign
+      integer, intent(out) :: phase
+         !! 1 if the first phase is needed (there are equality constraints, or an inequality
+         !! constraint that the starting basis violates), 2 if the starting basis is feasible
+      integer :: first_artificial, last_artificial, first_slack, last_slack
+
+      first_artificial = n + k + 1
+      last_artificial = n + k + l
+      first_slack = last_artificial + 1
+      last_slack = last_artificial + m
+
+      phase = 2
+      costs = 0.0_wp
+      restricted = 0
+      if (l /= 0) then
+         costs(:, first_artificial:last_artificial) = 1.0_wp
+         restricted(:, first_artificial:last_artificial) = 1
+         phase = 1
+      end if
+      if (m /= 0) then
+         costs(2, first_slack:last_slack) = 1.0_wp
+         restricted(2, first_slack:last_slack) = 1
+         if (any(q(k + l + 1:k + l + m, n + 2) < 0.0_wp)) phase = 1
+      end if
+   end subroutine set_up_phase1_costs
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine apply_sign_restrictions(n, k, x, res, q, costs, restricted, phase)
+      !! Add the sign restrictions requested through `kode = 1` to the phase 1 costs.
+      !!
+      !! A restricted sign gets a cost of 1 and the restriction flag 1 (see `set_up_phase1_costs`).
+      !! A restriction that the starting basis violates makes the first phase necessary.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: k
+         !! Number of rows of the matrix `A`
+      real(wp), contiguous, intent(in) :: x(:)
+         !! Sign restriction of each unknown: -1 for `x(j) <= 0`, 0 for none, 1 for `x(j) >= 0`
+      real(wp), contiguous, intent(in) :: res(:)
+         !! Sign restriction of the residual of each of the `k` equations: -1 for `b - A x <= 0`,
+         !! 0 for none, 1 for `b - A x >= 0`
+      real(wp), contiguous, intent(in) :: q(:, :)
+         !! Simplex tableau with the labels set (see `set_up_labels`)
+      real(wp), contiguous, intent(inout) :: costs(:, :)
+         !! Phase 1 costs, one row for each sign
+      integer, contiguous, intent(inout) :: restricted(:, :)
+         !! Restriction flags, one row for each sign
+      integer, intent(inout) :: phase
+         !! Set to 1 if a restriction is violated by the starting basis; otherwise unchanged
+      integer :: j
+
+      do j = 1, n
+         if (x(j) < 0.0_wp) then
+            costs(1, j) = 1.0_wp
+            restricted(1, j) = 1
+         else if (x(j) /= 0.0_wp) then
+            costs(2, j) = 1.0_wp
+            restricted(2, j) = 1
+         end if
+      end do
+      do j = 1, k
+         if (res(j) < 0.0_wp) then
+            costs(1, n + j) = 1.0_wp
+            restricted(1, n + j) = 1
+            if (q(j, n + 2) > 0.0_wp) phase = 1
+         else if (res(j) /= 0.0_wp) then
+            costs(2, n + j) = 1.0_wp
+            restricted(2, n + j) = 1
+            if (q(j, n + 2) < 0.0_wp) phase = 1
+         end if
+      end do
+   end subroutine apply_sign_restrictions
 
 end module l1_calgo552

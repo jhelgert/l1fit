@@ -124,6 +124,11 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   * *Using the first-sign cost for a flipped label in the **second** (correction) loop* is reached often
     (582 times in the corpus) but never observable: in all 582 events `cu(1,j) == cu(2,j)`. Empirical, not
     a proof; the sign test there looks like defensive symmetry in the original code. Not worth a test.
+* **Phase 1 set-up (`set_up_phase1_costs`, `apply_sign_restrictions`, 12 mutations)** - all killed on the
+  first attempt (wrong sign rows, shifted or shortened ranges, inverted conditions, forced-phase-1
+  logic, the `kode` call-site test); the narrowest kill is a negative-sign residual restriction
+  whose row label is positive (8 failing tests). No new generator was needed: the sign-restricted
+  and boundary generators added earlier cover these branches.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
