@@ -1,0 +1,103 @@
+[build-system]
+requires = ["scikit-build-core>=0.11", "nanobind>=2.9"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "l1fit"
+version = "0.1.0"
+description = "Fast constrained L1 curve fitting: a modernized Fortran implementation of ACM TOMS algorithm 552"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["numpy>=2.0"]
+classifiers = [
+    "Programming Language :: Fortran",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
+]
+
+[dependency-groups]
+dev = [
+    "nanobind>=2.9",  # stub generation test
+    "pyrefly",
+    "pytest>=8",
+    "ruff",
+    "scipy",  # reference solutions (HiGHS) for the tests
+]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+cmake.build-type = "Release"
+wheel.py-api = "cp312"  # one stable-ABI wheel per platform for Python >= 3.12
+wheel.packages = ["python/l1fit"]
+# The sdist holds what is needed to build and read the package, not the tests, benchmarks or tooling.
+# Only the sources are listed (not whole directories), so that generated files never leak in.
+sdist.include = [
+    "python/l1fit/*.py",
+    "python/l1fit/*.pyi",
+    "python/l1fit/py.typed",
+    "src/*.f90",
+    "native/*.cpp",
+    "CMakeLists.txt",
+    "/README.md",
+    "/pyproject.toml",
+]
+sdist.exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    ".venv",
+    "/.pytest_cache",
+    "/.ruff_cache",
+    "/.gitignore",
+    "/build",
+    "/dist",
+    "/tests",
+    "/legacy",
+    "/.agents",
+    "/uv.lock",
+    "/fortitude.toml",
+]
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "CMakeLists.txt" },
+    { file = "native/**/*.cpp" },
+    { file = "src/**/*.f90" },
+]
+
+# Linting and type checking cover the new Python package only.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["python"]
+extend-exclude = ["tests", "legacy", "build", "native", "python/l1fit/_core.pyi"]  # _core.pyi is generated
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RET", "RUF", "D", "ANN", "ARG",
+    "PL", "TRY", "PTH", "T20", "S", "ISC", "PIE", "PERF", "FURB", "TC",
+]
+ignore = [
+    "D203", "D213",  # numpy docstring convention: the other style of each pair
+    "TRY003",  # one descriptive message per validation check; a class per message would be ceremony
+]
+
+[tool.ruff.lint.per-file-ignores]
+# A, C, E are the names of the problem matrices in the paper, the README and the tests (public keywords)
+"python/l1fit/_solver.py" = ["N803", "PLR0917"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.pyrefly]
+project-includes = ["python"]
+# The editable install puts python/ on sys.path, so pyrefly would treat it as site-packages and skip it
+project-excludes = ["**/__pycache__", "**/.venv/**", "**/build/**"]
+search-path = ["python"]
+python-version = "3.12"

@@ -100,11 +100,11 @@ def available_solvers() -> dict[str, object]:
     # The bounds-checked build (``SrcCheckedCL1``) is deliberately not registered here: a run-time
     # check failure aborts the process, so it runs in a child process, see test_checked_build.py.
 
-    # Future hook: once the modernized extension exists, register it, e.g.
-    #
-    #   try:
-    #       from l1fit_adapter import ExtensionCL1
-    #       solvers["extension"] = ExtensionCL1()
-    #   except ImportError:
-    #       pass
+    # The CPython extension (public interface of the package), if it is installed: ``uv sync``.
+    try:
+        from extension_adapter import ExtensionCL1
+    except ImportError:
+        pass
+    else:
+        solvers["extension"] = ExtensionCL1()
     return solvers

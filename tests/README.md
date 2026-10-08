@@ -1,7 +1,8 @@
 # Tests and benchmarks for the L1 solver
 
 These tests pin down the behaviour of `CL1` (ACM TOMS algorithm 552, Barrodale & Roberts) so the
-Fortran can be modernized and wrapped as a CPython extension without silently changing results.
+Fortran can be modernized and wrapped as a CPython extension without silently changing results. The extension
+(`l1fit`, built with `uv sync`) is tested through the same adapters, bit-for-bit against the frozen oracles.
 
 ## Source layout
 
@@ -9,7 +10,7 @@ Fortran can be modernized and wrapped as a CPython extension without silently ch
 |------|---------|
 | `../src/l1_precision.f90` | Working precision `wp` (currently `c_double`) and accumulator precision `dp`. |
 | `../src/l1_calgo552.f90` | Fortran interface `cl1(k,l,m,n,q,kode,toler,iter,x,res,error)`: assumed-shape `contiguous` arrays, validated arguments, local workspace. Status constants `L1_OPTIMAL ... L1_ALLOC_FAILED`. |
-| `../src/l1_c_api.f90` | `bind(C)` wrapper `l1_cl1` with the same 11 arguments (explicit-shape arrays derived from `k,l,m,n`) for `ctypes` / the future CPython extension. |
+| `../src/l1_c_api.f90` | `bind(C)` wrapper `l1_cl1` with the same 11 arguments (explicit-shape arrays derived from `k,l,m,n`) for `ctypes` and for the CPython extension (`../native/_core.cpp`). |
 | `../legacy/CALGO552.f` | **Frozen oracle #1**: the repaired original (fixed-form, single precision, 18-argument interface). Never refactor this file. |
 | `../legacy/f90_double/` | **Frozen oracle #2**: the first free-form double-precision version (module + `cl1_` with the 18-argument interface), frozen before the interface was changed. Reference for bit-for-bit checks. Excluded from linting in `fortitude.toml`. |
 | `../legacy/CALGO552_as_received.f90.txt` | The file exactly as received (9 garbled lines, did not compile). |
@@ -26,6 +27,7 @@ Fortran can be modernized and wrapped as a CPython extension without silently ch
 | `test_l1_instances.py` | Correctness, closed-form, metamorphic and golden tests per adapter. |
 | `test_differential.py` | Bit-for-bit differential fuzzing against the frozen oracles. |
 | `fortran/check_cl1_interface.f90`, `test_fortran_interface.py` | Fortran program checking argument validation and oversized arrays (not reachable through the C ABI); built strictly with `-fcheck=all` and run by pytest. |
+| `extension_adapter.py`, `test_extension_api.py` | The extension: an adapter (all correctness and differential tests run through `l1fit.solve_l1`) and tests of the Python interface and of the binding's contract. |
 | `test_hang_guard.py` | Tests of the protection against solver calls that never return (see "Hang protection"). |
 | `test_checked_build.py`, `run_checked_build.py` | All instances and fuzz cases against `src/` built with `-fcheck=all -O0`, in a child process (a violated run-time check aborts the whole process). |
 | `benchmark.py`, `benchmarks/legacy_baseline.json` | Timing runner and the recorded baseline of the legacy oracle (single precision). |
@@ -36,7 +38,8 @@ Fortran can be modernized and wrapped as a CPython extension without silently ch
 |------|---------|-------|-----------|------|
 | `legacy` | `legacy/CALGO552.f` | `cl1_` (18 args) | single | oracle; golden values come from it |
 | `legacy_double` | `legacy/f90_double/` | `cl1_` (18 args) | double | oracle for double-precision refactors |
-| `src` | `src/*.f90` | `l1_cl1` (11 args) | read from `l1_precision.f90` | the code under development |
+| `src` | `src/*.f90` | `l1_cl1` (11 args) | read from `l1_precision.f90` | the Fortran code under development |
+| `extension` | the installed package `l1fit` | `l1fit.solve_l1` (public interface) | double | the whole stack: validation, packing, nanobind binding, Fortran; registered only if `l1fit` is installed |
 | `SrcCheckedCL1` | `src/*.f90`, `-fcheck=all -O0` | `l1_cl1` | idem | only used in the child process of `test_checked_build.py` |
 
 All adapters call the library through `ctypes`; each is compiled with `gfortran` into
@@ -48,6 +51,10 @@ All adapters call the library through `ctypes`; each is compiled with `gfortran`
 
 ```bash
 # all tests (about 10 s)
+uv sync                                  # builds the extension (editable); rebuilds when native/ or src/ change
+uv run pytest tests -q                   # everything, including the extension (about 15 s)
+
+# Fortran-only, without building the extension (the extension tests are then skipped)
 uv run --no-project --with numpy --with scipy --with pytest pytest tests -q
 
 # benchmark (+ compare with the recorded baseline, same machine only)
@@ -240,6 +247,42 @@ Results are in `tests/benchmarks/vs_original.json` (Apple M1 Pro, GNU Fortran 16
   current) versus 1.1e-14 (double). The solutions differ by up to 5.5e-5 relative (`big_20000x20`), the
   single-precision error.
 
+## The CPython extension
+
+`l1fit` is a nanobind extension (stable ABI, one wheel for Python 3.12 to 3.15) over the C entry point
+`l1_cl1`. It is verified on three levels:
+
+* **Bit-for-bit through the whole stack:** the `extension` adapter runs the persisted instances and the
+  whole differential corpus (2603 cases) through `l1fit.solve_l1`, and every result (status, iterations, `x`,
+  residuals, objective) must be identical to the frozen double precision oracle.
+* **The Python interface and the binding** (`test_extension_api.py`, 66 tests): validation of every argument,
+  optional constraints and signs, inputs never modified, layout independence, threads, the generated type stub
+  not going stale, the README example, and the contract of the binding itself. The binding converts and copies
+  nothing: the solver works in place, so a silently converted array would lose the result, which is why a
+  wrong dtype, layout or read-only array must raise `TypeError`, and shapes (which the Fortran entry point
+  cannot check) are validated in C++.
+* **Several Pythons, one binary:** the wheel built once under Python 3.12 was installed unchanged into
+  3.12, 3.13, 3.14 and 3.15 environments, and the whole suite (5458 tests) passes against the installed wheel.
+
+**Mutation testing of the extension layers** (rebuilding for each change): all 13 mutations of the binding
+and all 21 of the Python wrapper are caught (dropping `noconvert` or the layout constraints, off-by-one shape
+checks, a missing overflow guard, every block of the packing, the sign handling, default options, the
+error mapping). Three gaps were found and closed by new tests: nothing checked the binding's contract at all
+(the adapter always passes well-formed arrays), the defaults of `tol` and `max_iter` were untested, and the
+threading test only proved safety, not that the GIL is released (it now measures the speed-up: 3.5x with
+4 threads, 1.03x with the GIL held).
+
+**Pitfall found on the way:** `uv sync` does not rebuild an editable install when only `native/` or `src/`
+change, unless told to (`tool.uv.cache-keys` in `pyproject.toml`). A first mutation run therefore tested the
+*unmutated* module eleven times and reported "all mutants survive"; it was spotted because the timings were
+identical to the millisecond. Always check that a mutation experiment really runs the mutated code.
+
+**Wheels and Windows (not done yet).** The development build links `libgfortran` dynamically from the
+compiler's directory; portable wheels need it bundled or linked statically (`L1FIT_STATIC_FORTRAN_RUNTIME`
+in `CMakeLists.txt`, untested). There is no `gfortran` on Windows; the plan is LFortran there, which is
+unverified: it has to compile the F2018 features that the solver uses (`implicit none (type, external)`,
+`contiguous`, assumed-shape arrays, `bind(C)`, named `block` constructs, `allocate` with `stat`/`errmsg`).
+
 ## Known property of the legacy code
 
 Single precision limits it: on `bench_cvxpy_script_1000x250` the default `TOLER` (2e-5) ends with
@@ -248,7 +291,7 @@ Single precision limits it: on `bench_cvxpy_script_1000x250` the default `TOLER`
 `src` build solves it with the default tolerance (`KODE=0`, 921 iterations, objective within 2e-15 of
 HiGHS), and with any `TOLER` from 1e-12 to 1e-6.
 
-## Adding another implementation (e.g. the CPython extension)
+## Adding another implementation
 
 Write an adapter with `name`, `precision`, `is_oracle = False`, `matches_legacy` and
 `solve(inst) -> Result`, and register it in `solvers.available_solvers()`. Every correctness and
