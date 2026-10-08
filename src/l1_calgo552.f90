@@ -99,7 +99,7 @@ contains
       integer :: alloc_stat
 !     ..
 !     .. Local Scalars ..
-      real(wp) :: cuv, pivot, xmax, xmin, tmp1, zu, zv
+      real(wp) :: cuv, pivot, xmax, xmin, tmp1
       integer :: i, iq, ii, iineg, in, iout, iphase, j, js, kforce, kk
       integer :: klm, klm1, klm2, max_iter, n1, n2, nk
       logical :: to_phase2, at_optimum, pivot_found
@@ -157,33 +157,7 @@ contains
 
           iterate: do
 ! DETERMINE THE VECTOR TO ENTER THE BASIS.
-              xmax = 0.0_wp
-              at_optimum = (js > n)
-              if (.not. at_optimum) then
-                  entering_candidates: do j = js,n
-                      zu = q(klm1,j)
-                      ii = int(q(klm2,j))
-                      if (ii > 0) then
-                          zv = -zu - cu(1,ii) - cu(2,ii)
-                      else
-                          ii = -ii
-                          zv = zu
-                          zu = -zu - cu(1,ii) - cu(2,ii)
-                      end if
-                      if (kforce == 1 .and. ii > n) cycle entering_candidates
-                      candidate_u: block
-                          if (iu(1,ii) == 1) exit candidate_u
-                          if (zu <= xmax) exit candidate_u
-                          xmax = zu
-                          in = j
-                      end block candidate_u
-                      if (iu(2,ii) == 1) cycle entering_candidates
-                      if (zv <= xmax) cycle entering_candidates
-                      xmax = zv
-                      in = j
-                  end do entering_candidates
-                  at_optimum = (xmax <= toler)
-              end if
+              call select_entering_column(n, klm, js, kforce, toler, q, cu, iu, in, xmax, at_optimum)
 !
 ! TEST FOR OPTIMALITY.
 !
@@ -675,5 +649,72 @@ contains
       q(pivot_row, n + 2) = q(klm + 2, pivot_column)
       q(klm + 2, pivot_column) = label
    end subroutine pivot_tableau
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine select_entering_column(n, klm, first_column, force_original_variables, toler, q, costs, restricted, &
+                                     entering_column, largest_gain, at_optimum)
+      !! Select the column of the simplex tableau whose variable enters the basis.
+      !!
+      !! Each of the columns `first_column:n` holds a non-basic variable, which can enter the basis
+      !! with either of its two signs. The gain of a sign is the marginal cost in row `klm+1` minus
+      !! the costs of the variable (`costs(1,j) + costs(2,j)`), taken with the appropriate sign; a
+      !! restricted sign (`restricted(.,j) == 1`) is not allowed to enter. The sign with the largest
+      !! gain wins, and the first one wins a tie. The current basis is optimal if no gain exceeds
+      !! `toler`.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      integer, intent(in) :: first_column
+         !! First column of the tableau that is still active
+      integer, intent(in) :: force_original_variables
+         !! 1 if only the original variables `x` (labels `<= n`) may enter the basis, 0 otherwise
+      real(wp), intent(in) :: toler
+         !! Tolerance: a gain that does not exceed it does not count
+      real(wp), contiguous, intent(in) :: q(:, :)
+         !! Simplex tableau with at least `klm+2` rows and `n+2` columns
+      real(wp), contiguous, intent(in) :: costs(:, :)
+         !! Costs of the variables, one row for each sign
+      integer, contiguous, intent(in) :: restricted(:, :)
+         !! Restriction flags of the variables, one row for each sign
+      integer, intent(inout) :: entering_column
+         !! Column of the entering variable. Only set when a candidate with a positive gain is
+         !! found; it keeps its value otherwise (it is not used then)
+      real(wp), intent(out) :: largest_gain
+         !! Gain of the selected candidate (0 if there is none)
+      logical, intent(out) :: at_optimum
+         !! True if no candidate has a gain larger than `toler`
+      real(wp) :: gain_negative, gain_positive
+      integer :: j, label
+
+      largest_gain = 0.0_wp
+      at_optimum = (first_column > n)
+      if (at_optimum) return
+
+      entering_candidates: do j = first_column, n
+         gain_negative = q(klm + 1, j)
+         label = int(q(klm + 2, j))
+         if (label > 0) then
+            gain_positive = -gain_negative - costs(1, label) - costs(2, label)
+         else
+            label = -label
+            gain_positive = gain_negative
+            gain_negative = -gain_negative - costs(1, label) - costs(2, label)
+         end if
+         if (force_original_variables == 1 .and. label > n) cycle entering_candidates
+         negative_sign: block
+            if (restricted(1, label) == 1) exit negative_sign
+            if (gain_negative <= largest_gain) exit negative_sign
+            largest_gain = gain_negative
+            entering_column = j
+         end block negative_sign
+         if (restricted(2, label) == 1) cycle entering_candidates
+         if (gain_positive <= largest_gain) cycle entering_candidates
+         largest_gain = gain_positive
+         entering_column = j
+      end do entering_candidates
+      at_optimum = (largest_gain <= toler)
+   end subroutine select_entering_column
 
 end module l1_calgo552

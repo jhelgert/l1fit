@@ -141,6 +141,10 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   inverted, labels not exchanged, wrong label read by the caller). One is an *equivalent mutant*,
   established by reading the code: dropping the guard `j /= pivot_column` on the division of the pivot row
   changes the pivot cell, which is not read before it is overwritten by `1/pivot`.
+* **Entering-column selection (`select_entering_column`, 14 mutations)** - all killed (first failing test
+  each; run with `-x`): both tie-break directions, either restriction flag ignored or read from the wrong
+  sign, the forced-original-variables rule and its boundary, the optimality threshold, either loop end,
+  the arithmetic of both gains, and the exchange of the two gains for a flipped column.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
