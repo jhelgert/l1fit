@@ -16,6 +16,8 @@ program check_cl1_interface
 
    call check_valid_problem_is_solved()
    call check_oversized_arrays_give_identical_results()
+   call check_outputs_are_written_where_documented()
+   call check_every_residual_entry_is_zeroed()
    call check_invalid_arguments_are_rejected()
 
    if (num_failures /= 0) then
@@ -94,6 +96,80 @@ contains
       call report(all(x(1:NUM_COLS) == x_exact), "oversized arrays: bit-identical x")
       call report(error == error_exact, "oversized arrays: bit-identical error")
    end subroutine check_oversized_arrays_give_identical_results
+
+   subroutine check_outputs_are_written_where_documented()
+      !! `x(1:n)` and `res(1:k+l+m)` are completely overwritten, including the entries of variables
+      !! and rows that are not in the final basis (these must read exactly 0, not a stale value),
+      !! and nothing beyond them is touched.
+      !!
+      !! Which rows end up outside the basis depends on the data, so the same problem is solved with
+      !! the rows cyclically shifted: every row position gets a turn at not being in the basis, and a
+      !! missing zeroing of any single `res` entry shows up as a stale sentinel value.
+      real(wp), parameter :: SENTINEL = 12345.0_wp
+      integer, parameter :: NUM_VARS = 3
+      real(wp), parameter :: T(NUM_ROWS) = [4.0_wp, 0.0_wp, 1.0_wp, 2.0_wp, 3.0_wp]
+      real(wp), parameter :: B(NUM_ROWS) = [30.0_wp, 1.0_wp, 3.0_wp, 5.0_wp, 7.0_wp]
+      real(wp) :: q(NUM_ROWS + 2, NUM_VARS + 2), x(NUM_VARS + 4), res(NUM_ROWS + 4), error
+      real(wp) :: expected_res(NUM_ROWS)
+      integer :: kode, iter, shift
+      character(len=32) :: label
+
+      do shift = 0, NUM_ROWS - 1
+         write (label, "(a,i0)") "outputs, rows shifted by ", shift
+         q = 0.0_wp
+         q(1:NUM_ROWS, 1) = 1.0_wp
+         q(1:NUM_ROWS, 2) = cshift(T, shift)
+         ! The third column stays 0: the third variable never enters the basis.
+         q(1:NUM_ROWS, NUM_VARS + 1) = cshift(B, shift)
+         ! Row 1 of the unshifted data is the outlier (residual 21); all other rows fit exactly.
+         expected_res = 0.0_wp
+         expected_res(1 + modulo(-shift, NUM_ROWS)) = 21.0_wp
+
+         x = SENTINEL
+         res = SENTINEL
+         kode = 0
+         iter = 100
+         call cl1(NUM_ROWS, 0, 0, NUM_VARS, q, kode, 1.0e-10_wp, iter, x, res, error)
+
+         call report(kode == L1_OPTIMAL, trim(label)//": kode == L1_OPTIMAL")
+         call report(all(abs(x(1:2) - [1.0_wp, 2.0_wp]) < 1.0e-9_wp), trim(label)//": x(1:2) == (1, 2)")
+         call report(x(3) == 0.0_wp, trim(label)//": the variable outside the basis reads exactly 0")
+         call report(all(x(NUM_VARS + 1:) == SENTINEL), trim(label)//": x beyond n is untouched")
+         call report(all(abs(res(1:NUM_ROWS) - expected_res) < 1.0e-9_wp), trim(label)//": res(1:k) == b - A x")
+         call report(all(res(NUM_ROWS + 1:) == SENTINEL), trim(label)//": res beyond k+l+m is untouched")
+      end do
+   end subroutine check_outputs_are_written_where_documented
+
+   subroutine check_every_residual_entry_is_zeroed()
+      !! The L1 fit of one constant to three numbers is their median. The row holding the median is
+      !! interpolated exactly, so its residual variable is not in the final basis and is never
+      !! assigned by the solver: it reads 0 only because the outputs are zeroed first. Putting the
+      !! median in each of the three row positions makes every `res` entry unassigned once.
+      real(wp), parameter :: SENTINEL = 12345.0_wp
+      integer, parameter :: NUM_POINTS = 3
+      real(wp), parameter :: VALUES(NUM_POINTS, NUM_POINTS) = reshape( &
+         [2.0_wp, 1.0_wp, 3.0_wp, &   ! median in row 1
+          1.0_wp, 2.0_wp, 3.0_wp, &   ! median in row 2
+          1.0_wp, 3.0_wp, 2.0_wp], [NUM_POINTS, NUM_POINTS])   ! median in row 3
+      real(wp) :: q(NUM_POINTS + 2, 3), x(1), res(NUM_POINTS), error
+      integer :: kode, iter, median_row
+
+      do median_row = 1, NUM_POINTS
+         q = 0.0_wp
+         q(1:NUM_POINTS, 1) = 1.0_wp
+         q(1:NUM_POINTS, 2) = VALUES(:, median_row)
+         x = SENTINEL
+         res = SENTINEL
+         kode = 0
+         iter = 100
+         call cl1(NUM_POINTS, 0, 0, 1, q, kode, 1.0e-10_wp, iter, x, res, error)
+
+         call report(kode == L1_OPTIMAL, "median: kode == L1_OPTIMAL")
+         call report(abs(x(1) - 2.0_wp) < 1.0e-9_wp, "median: x == 2")
+         call report(res(median_row) == 0.0_wp, "median: the interpolated row reads exactly 0")
+         call report(all(abs(res - (VALUES(:, median_row) - 2.0_wp)) < 1.0e-9_wp), "median: res == b - x")
+      end do
+   end subroutine check_every_residual_entry_is_zeroed
 
    subroutine check_rejected(k, l, m, n, q, x, res, label)
       !! Call `cl1` with arguments that must be rejected and check the reported state.

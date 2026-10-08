@@ -101,7 +101,7 @@ contains
 !     .. Local Scalars ..
       real(dp) :: sum
       real(wp) :: cuv, pivot, sn, tpivot, xmax, xmin, tmp1, zu, zv
-      integer :: i, iq, ii, iimn, iineg, in, iout, iphase, j, jmn, jpn, js, kforce, kk
+      integer :: i, iq, ii, iimn, iineg, in, iout, iphase, j, jpn, js, kforce, kk
       integer :: klm, klm1, klm2, max_iter, n1, n2, nk, nk1, nkl, nkl1, nklm
       logical :: to_phase2, at_optimum, pivot_found
 !     ..
@@ -155,28 +155,17 @@ contains
       end do label_rows
 ! SET UP PHASE 1 COSTS.
       iphase = 2
-      do j = 1,nklm
-          cu(1,j) = 0.0_wp
-          cu(2,j) = 0.0_wp
-          iu(1,j) = 0
-          iu(2,j) = 0
-      end do
+      cu = 0.0_wp
+      iu = 0
       if (l /= 0) then
-          do j = nk1,nkl
-              cu(1,j) = 1.0_wp
-              cu(2,j) = 1.0_wp
-              iu(1,j) = 1
-              iu(2,j) = 1
-          end do
+          cu(:,nk1:nkl) = 1.0_wp
+          iu(:,nk1:nkl) = 1
           iphase = 1
       end if
       if (m /= 0) then
-          do j = nkl1,nklm
-              cu(2,j) = 1.0_wp
-              iu(2,j) = 1
-              jmn = j - n
-              if (q(jmn,n2) < 0.0_wp) iphase = 1
-          end do
+          cu(2,nkl1:nklm) = 1.0_wp
+          iu(2,nkl1:nklm) = 1
+          if (any(q(nkl1-n:nklm-n,n2) < 0.0_wp)) iphase = 1
       end if
       if (kode /= 0) then
 ! NONNEGATIVITY RESTRICTIONS ON X (SIGN IN X(J)) AND ON THE RESIDUALS (SIGN IN RES(J)).
@@ -211,14 +200,8 @@ contains
           if (to_phase2) then
 ! SET UP PHASE 2 COSTS.
               iphase = 2
-              do j = 1,nklm
-                  cu(1,j) = 0.0_wp
-                  cu(2,j) = 0.0_wp
-              end do
-              do j = n1,nk
-                  cu(1,j) = 1.0_wp
-                  cu(2,j) = 1.0_wp
-              end do
+              cu = 0.0_wp
+              cu(:,n1:nk) = 1.0_wp
               phase2_costs: do i = 1,klm
                   ii = int(q(i,n2))
                   if (ii > 0) then
@@ -440,12 +423,8 @@ contains
 ! PREPARE OUTPUT.
 !
       sum = 0.0_dp
-      do j = 1,n
-          x(j) = 0.0_wp
-      end do
-      do i = 1,klm
-          res(i) = 0.0_wp
-      end do
+      x(1:n) = 0.0_wp
+      res(1:klm) = 0.0_wp
       do i = 1,klm
           ii = int(q(i,n2))
           if (ii > 0) then
