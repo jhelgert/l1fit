@@ -16,6 +16,12 @@ from legacy_cl1 import LegacyCL1
 
 N_CASES = 400
 N_SIGN_CASES = 400  # cases dedicated to KODE=1 sign restrictions (found necessary by mutation testing)
+N_REDUNDANT_CASES = 300  # redundant equality rows reach the artificial-pivot swap (found by mutation testing)
+# Seeds of ``_redundant_equality_case`` for which the *label column* of the artificial-pivot row swap
+# changes the reported residuals / objective (same x, iterations and KODE): only 3 of 5000 cases, found
+# by comparing the frozen oracle with a mutant that skips that column.  Always run, so that damaging the
+# swap is detected without needing thousands of random cases.
+PINNED_REDUNDANT_SEEDS = (1511, 3003, 4455)
 N_BOUNDARY_CASES = (
     1500  # tiny integer problems at exact-zero boundaries (TOLER=0), idem
 )
@@ -127,6 +133,53 @@ def _boundary_case(seed: int) -> tuple[Instance, float]:
     return inst, 0.0
 
 
+def _redundant_equality_case(seed: int) -> tuple[Instance, float]:
+    """Problems with one redundant (linearly dependent) equality row and ``TOLER = 0``.
+
+    A redundant equality leaves an artificial variable in the basis at the end of phase 1; with a zero
+    tolerance phase 2 then pivots it out through the "artificial pivot" row exchange, a branch that the
+    other generators reach in only ~0.3% of their cases (found by mutation testing).  Here about 8% of
+    the cases reach it."""
+    rng = np.random.Generator(np.random.PCG64(95_000 + seed))
+    n = int(rng.integers(2, 7))
+    l = int(rng.integers(2, n + 1))  # noqa: E741
+    k = int(rng.integers(n, 4 * n))
+    m = int(rng.choice([0, 1, 2, 4]))
+    integer = seed % 2 == 1
+
+    def mat(rows: int) -> np.ndarray:
+        if integer:
+            return rng.integers(-3, 4, size=(rows, n)).astype(float)
+        return rng.standard_normal((rows, n))
+
+    A, E, C = mat(k), mat(m), mat(l - 1)
+    C = np.vstack([C, C[0] + (C[1] if l > 2 else 0.0)])  # last equality = combination of earlier ones
+    x0 = rng.integers(-2, 3, size=n).astype(float) if integer else rng.standard_normal(n)
+    noise = rng.integers(-3, 4, size=k).astype(float) if integer else rng.standard_normal(k)
+    slack = rng.integers(0, 3, size=m).astype(float) if integer else rng.random(m)
+    inst = Instance(f"redundant{seed}", "", A, A @ x0 + noise, C, C @ x0, E, E @ x0 + slack)
+    return inst, 0.0
+
+
+def fuzz_corpus() -> list[tuple[str, int]]:
+    """Every (generator name, seed) of the differential corpus, in one place (also used by the
+    bounds-checked child process in ``run_checked_build.py`` so that the two cannot drift apart)."""
+    return (
+        [("random", s) for s in range(N_CASES)]
+        + [("sign_restricted", s) for s in range(N_SIGN_CASES)]
+        + [("boundary", s) for s in range(N_BOUNDARY_CASES)]
+        + [("redundant_equality", s) for s in [*range(N_REDUNDANT_CASES), *PINNED_REDUNDANT_SEEDS]]
+    )
+
+
+GENERATORS = {
+    "random": _random_case,
+    "sign_restricted": _sign_restricted_case,
+    "boundary": _boundary_case,
+    "redundant_equality": _redundant_equality_case,
+}
+
+
 @pytest.fixture
 def oracle(solver, all_solvers):
     """The frozen oracle with the same precision as the solver under test (None for oracles)."""
@@ -160,6 +213,17 @@ def test_sign_restricted_matches_legacy_bit_for_bit(solver, oracle, seed):
 @pytest.mark.parametrize("seed", range(N_BOUNDARY_CASES))
 def test_boundary_matches_legacy_bit_for_bit(solver, oracle, seed):
     inst, toler = _boundary_case(seed)
+    ref = oracle.solve(inst, toler=toler)
+    got = solver.solve(inst, toler=toler)
+    assert (got.kode, got.iterations) == (ref.kode, ref.iterations)
+    assert np.array_equal(got.x, ref.x), "X differs"
+    assert np.array_equal(got.res, ref.res), "RES differs"
+    assert got.error == ref.error, "ERROR differs"
+
+
+@pytest.mark.parametrize("seed", [*range(N_REDUNDANT_CASES), *PINNED_REDUNDANT_SEEDS])
+def test_redundant_equalities_match_legacy_bit_for_bit(solver, oracle, seed):
+    inst, toler = _redundant_equality_case(seed)
     ref = oracle.solve(inst, toler=toler)
     got = solver.solve(inst, toler=toler)
     assert (got.kode, got.iterations) == (ref.kode, ref.iterations)

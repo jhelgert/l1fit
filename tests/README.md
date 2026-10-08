@@ -86,11 +86,13 @@ for (in)equality (`Q(KLM1,IN) /= XMAX`, sign flags of `x`/`res`).
 2. Closed-form, iteration-limit and metamorphic tests (row permutation, scaling of the whole problem).
 3. `test_oracle_reproduces_golden_output` - adapters flagged `matches_legacy` (single precision only)
    must reproduce the recorded legacy output exactly (`KODE`, iterations, `x`, objective).
-4. `test_differential.py` - 2300 generated problems; every non-oracle adapter is compared with the
+4. `test_differential.py` - about 2600 generated problems; every non-oracle adapter is compared with the
    frozen oracle **of its own precision** and must give *identical* `KODE`, iteration count, `X`, `RES`
-   and `ERROR` (`np.array_equal`). Three generators: general (ties, degeneracy, duplicates, infeasible
-   systems, tiny iteration limits, random `TOLER`), sign-restriction heavy (`KODE=1`), and tiny integer
-   problems at exact boundaries (`TOLER=0`).
+   and `ERROR` (`np.array_equal`). Four generators: general (ties, degeneracy, duplicates, infeasible
+   systems, tiny iteration limits, random `TOLER`), sign-restriction heavy (`KODE=1`), tiny integer
+   problems at exact boundaries (`TOLER=0`), and problems with one redundant equality row (`TOLER=0`)
+   plus three pinned seeds (see "Mutation testing"). `fuzz_corpus()` lists every case and is shared with
+   the bounds-checked child process.
 5. Interface tests (Fortran): each invalid argument is rejected with `L1_INVALID_INPUT` and leaves `q`
    untouched (every case violates exactly one condition); arrays larger than required give bit-identical
    results; no hidden array temporaries (`-fcheck=all`).
@@ -106,6 +108,13 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   `>=`->`>`, `SUM` index range, artificial-pivot guard, Gauss-Jordan swap condition. Three of them
   initially *survived* (a swapped residual-sign test and `<=` vs `<` against `TOLER`, twice); each exposed
   a gap in the fuzz generator, which is why the sign-restricted and boundary (`TOLER=0`) generators exist.
+* **Swap helpers (`swap_rows`, `swap_columns`, 4 mutations)** - all killed, but one needed a new
+  generator: leaving the label column out of the *artificial-pivot* row exchange survived 2300 cases.
+  That branch is reached by only ~0.3% of the general fuzz cases (6 of 2327), and even then the label
+  column only changes the reported residuals/objective (same `x`, `KODE`, iterations): 3 of 5000 cases
+  that reach it. A generator with a redundant equality row and `TOLER=0` reaches it in ~8% of cases, and
+  the three seeds that expose the label column are pinned (`PINNED_REDUNDANT_SEEDS`) so that thousands of
+  random cases are not needed.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**

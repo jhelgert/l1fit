@@ -203,11 +203,7 @@ contains
                       cu(2,ii) = 0.0_wp
                   end if
                   iq = iq + 1
-                  do j = 1,n2
-                      tmp1 = q(iq,j)
-                      q(iq,j) = q(i,j)
-                      q(i,j) = tmp1
-                  end do
+                  call swap_rows(q, iq, i, n2)
               end do phase2_costs
           end if
 ! COMPUTE THE MARGINAL COSTS.
@@ -308,11 +304,7 @@ contains
                       iout = i
                   end do find_artificial_pivot
                   if (xmax <= toler) exit artificial_pivot
-                  do j = 1,n2
-                      tmp1 = q(iq,j)
-                      q(iq,j) = q(iout,j)
-                      q(iout,j) = tmp1
-                  end do
+                  call swap_rows(q, iq, iout, n2)
                   iout = iq
                   iq = iq - 1
                   pivot = q(iout,in)
@@ -401,11 +393,7 @@ contains
               q(klm2,in) = tmp1
               ii = int(abs(tmp1))
               if (iu(1,ii) == 0 .or. iu(2,ii) == 0) cycle iterate
-              do i = 1,klm2
-                  tmp1 = q(i,in)
-                  q(i,in) = q(i,js)
-                  q(i,js) = tmp1
-              end do
+              call swap_columns(q, in, js, klm2)
               js = js + 1
           end do iterate
       end do simplex
@@ -490,5 +478,49 @@ contains
       end do
       error = real(residual_sum, wp)
    end subroutine extract_solution
+
+   subroutine swap_rows(q, row1, row2, num_columns)
+      !! Exchange the first `num_columns` entries of the rows `row1` and `row2` of `q`.
+      !!
+      !! Only the leading columns are exchanged: `q` may have more columns than the tableau uses.
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau
+      integer, intent(in) :: row1
+         !! First row
+      integer, intent(in) :: row2
+         !! Second row (may equal `row1`)
+      integer, intent(in) :: num_columns
+         !! Number of leading columns that are exchanged
+      real(wp) :: tmp
+      integer :: j
+
+      do j = 1, num_columns
+         tmp = q(row1, j)
+         q(row1, j) = q(row2, j)
+         q(row2, j) = tmp
+      end do
+   end subroutine swap_rows
+
+   subroutine swap_columns(q, column1, column2, num_rows)
+      !! Exchange the first `num_rows` entries of the columns `column1` and `column2` of `q`.
+      !!
+      !! Only the leading rows are exchanged: `q` may have more rows than the tableau uses.
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau
+      integer, intent(in) :: column1
+         !! First column
+      integer, intent(in) :: column2
+         !! Second column (may equal `column1`)
+      integer, intent(in) :: num_rows
+         !! Number of leading rows that are exchanged
+      real(wp) :: tmp
+      integer :: i
+
+      do i = 1, num_rows
+         tmp = q(i, column1)
+         q(i, column1) = q(i, column2)
+         q(i, column2) = tmp
+      end do
+   end subroutine swap_columns
 
 end module l1_calgo552
