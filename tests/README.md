@@ -156,6 +156,15 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   sets phase 2) and only decreased by the search itself, so it is 0 throughout phase 1 and the helper
   returns immediately; the `iphase /= 1` guard at the call site is redundant but kept (it is the
   original logic).
+* **Ratio test (`collect_ratio_candidates`, `take_smallest_ratio`, `select_leaving_row` and the `cl1` glue,
+  28 mutations)** - 27 killed (`-x`, first failing test each): candidate threshold, ratio column, last row
+  dropped, both loop ends and the tie-break of the smallest-ratio search, the swap-with-last removal,
+  both restriction signs, each term of the total cost, the bypass condition and each of the four
+  bypass updates, the `found` flag, the status reported for a failed test, the guard and the phase
+  passed from `cl1`. One is an *equivalent mutant* by reading the code: with a single candidate the
+  `num_candidates /= 1` guard only skips an empty loop and the self-assignment `ratios(1) = ratios(1)`.
+  One further "mutation" (`pivot_found = .true.` after the `exit simplex`) was invalid: it is
+  unreachable code. The path itself is exercised by 140 corpus cases that end with `KODE = 2`.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**

@@ -99,8 +99,8 @@ contains
       integer :: alloc_stat
 !     ..
 !     .. Local Scalars ..
-      real(wp) :: cuv, pivot, xmax, xmin, tmp1
-      integer :: i, iq, ii, iineg, in, iout, iphase, j, js, kforce, kk
+      real(wp) :: pivot, xmax
+      integer :: iq, ii, in, iout, iphase, js, kforce
       integer :: klm, klm1, klm2, max_iter, n1, n2, nk
       logical :: to_phase2, at_optimum, pivot_found
 !     ..
@@ -189,55 +189,11 @@ contains
               if (iphase /= 1) call pivot_on_restricted_row(n, toler, in, q, iq, iout, pivot, pivot_found)
 
               if (.not. pivot_found) then
-                  kk = 0
-                  ratio_candidates: do i = 1,klm
-                      tmp1 = q(i,in)
-                      if (tmp1 <= toler) cycle ratio_candidates
-                      kk = kk + 1
-                      res(kk) = q(i,n1)/tmp1
-                      s(kk) = i
-                  end do ratio_candidates
-! RATIO TEST: PICK THE SMALLEST RATIO, OR BYPASS THE VERTEX AND PICK AGAIN.
-                  bypass: do
-                      if (kk <= 0) then
-                          kode = L1_ROUNDING_ERRORS
-                          exit simplex
-                      end if
-                      xmin = res(1)
-                      iout = s(1)
-                      j = 1
-                      if (kk /= 1) then
-                          smallest_ratio: do i = 2,kk
-                              if (res(i) >= xmin) cycle smallest_ratio
-                              j = i
-                              xmin = res(i)
-                              iout = s(i)
-                          end do smallest_ratio
-                          res(j) = res(kk)
-                          s(j) = s(kk)
-                      end if
-                      kk = kk - 1
-                      pivot = q(iout,in)
-                      ii = int(q(iout,n2))
-                      if (iphase /= 1) then
-                          if (ii < 0) then
-                              iineg = -ii
-                              if (iu(1,iineg) == 1) exit bypass
-                          else
-                              if (iu(2,ii) == 1) exit bypass
-                          end if
-                      end if
-                      ii = abs(ii)
-                      cuv = cu(1,ii) + cu(2,ii)
-                      if (q(klm1,in)-pivot*cuv <= toler) exit bypass
-! BYPASS INTERMEDIATE VERTICES.
-                      do j = js,n1
-                          tmp1 = q(iout,j)
-                          q(klm1,j) = q(klm1,j) - tmp1*cuv
-                          q(iout,j) = -tmp1
-                      end do
-                      q(iout,n2) = -q(iout,n2)
-                  end do bypass
+                  call select_leaving_row(n, klm, js, iphase, toler, in, cu, iu, q, res, s, iout, pivot, pivot_found)
+                  if (.not. pivot_found) then
+                      kode = L1_ROUNDING_ERRORS
+                      exit simplex
+                  end if
               end if
 !
 ! GAUSS-JORDAN ELIMINATION.
@@ -769,5 +725,150 @@ contains
       pivot_value = q(leaving_row, entering_column)
       found = .true.
    end subroutine pivot_on_restricted_row
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine collect_ratio_candidates(n, klm, toler, entering_column, q, ratios, rows, num_candidates)
+      !! Collect the candidates of the ratio test.
+      !!
+      !! The candidates are the rows `i` whose entry in the entering column is larger than `toler`.
+      !! For each of them the ratio of the right-hand side `q(i,n+1)` to that entry is stored in
+      !! `ratios` and the row index in `rows`, both in the order of the rows.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      real(wp), intent(in) :: toler
+         !! Tolerance: an entry that does not exceed it is not a pivot
+      integer, intent(in) :: entering_column
+         !! Column of the entering variable
+      real(wp), contiguous, intent(in) :: q(:, :)
+         !! Simplex tableau with at least `klm` rows and `n+1` columns
+      real(wp), contiguous, intent(inout) :: ratios(:)
+         !! Ratios of the candidates (`size(ratios) >= klm`); entries beyond the candidates are unchanged
+      integer, contiguous, intent(inout) :: rows(:)
+         !! Rows of the candidates (`size(rows) >= klm`); entries beyond the candidates are unchanged
+      integer, intent(out) :: num_candidates
+         !! Number of candidates
+      real(wp) :: entry
+      integer :: i
+
+      num_candidates = 0
+      collect_candidates: do i = 1, klm
+         entry = q(i, entering_column)
+         if (entry <= toler) cycle collect_candidates
+         num_candidates = num_candidates + 1
+         ratios(num_candidates) = q(i, n + 1)/entry
+         rows(num_candidates) = i
+      end do collect_candidates
+   end subroutine collect_ratio_candidates
+
+   subroutine take_smallest_ratio(ratios, rows, num_candidates, row)
+      !! Remove the candidate with the smallest ratio from the list of candidates of the ratio test.
+      !!
+      !! The first candidate wins a tie. The last candidate takes the place of the removed one, so the
+      !! order of the remaining candidates changes, and `num_candidates` is decreased by one.
+      real(wp), contiguous, intent(inout) :: ratios(:)
+         !! Ratios of the candidates `1:num_candidates` (at least one)
+      integer, contiguous, intent(inout) :: rows(:)
+         !! Rows of the candidates `1:num_candidates`
+      integer, intent(inout) :: num_candidates
+         !! Number of candidates (at least 1 on entry), decreased by one
+      integer, intent(out) :: row
+         !! Row of the removed candidate
+      real(wp) :: smallest_ratio
+      integer :: i, smallest_index
+
+      smallest_ratio = ratios(1)
+      row = rows(1)
+      smallest_index = 1
+      if (num_candidates /= 1) then
+         find_smallest: do i = 2, num_candidates
+            if (ratios(i) >= smallest_ratio) cycle find_smallest
+            smallest_index = i
+            smallest_ratio = ratios(i)
+            row = rows(i)
+         end do find_smallest
+         ratios(smallest_index) = ratios(num_candidates)
+         rows(smallest_index) = rows(num_candidates)
+      end if
+      num_candidates = num_candidates - 1
+   end subroutine take_smallest_ratio
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine select_leaving_row(n, klm, first_column, phase, toler, entering_column, costs, restricted, q, &
+                                 ratios, rows, leaving_row, pivot_value, found)
+      !! Ratio test: select the row of the variable that leaves the basis.
+      !!
+      !! The rows with an entry larger than `toler` in the entering column are the candidates
+      !! (see `collect_ratio_candidates`). The one with the smallest ratio of the right-hand side to
+      !! that entry is taken. In the second phase, and for a variable that would not become
+      !! restricted, the search may continue past the first choice ("bypass"): if the marginal cost
+      !! still stays positive after passing the vertex, the row is negated and the next smallest
+      !! ratio is taken. The search ends at the first candidate that must be taken, or fails if no
+      !! candidates are left, which the caller reports as a loss of accuracy through rounding errors.
+      !!
+      !! `ratios` and `rows` are used as scratch space for the list of candidates.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      integer, intent(in) :: first_column
+         !! First column of the tableau that is still active
+      integer, intent(in) :: phase
+         !! Current phase (1 or 2) of the simplex method
+      real(wp), intent(in) :: toler
+         !! Tolerance: an entry that does not exceed it is not a pivot
+      integer, intent(in) :: entering_column
+         !! Column of the entering variable
+      real(wp), contiguous, intent(in) :: costs(:, :)
+         !! Costs of the variables, one row for each sign
+      integer, contiguous, intent(in) :: restricted(:, :)
+         !! Restriction flags of the variables, one row for each sign
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau with at least `klm+2` rows and `n+2` columns; rows are negated when a
+         !! vertex is bypassed
+      real(wp), contiguous, intent(inout) :: ratios(:)
+         !! Scratch space for at least `klm` ratios
+      integer, contiguous, intent(inout) :: rows(:)
+         !! Scratch space for at least `klm` row indices
+      integer, intent(inout) :: leaving_row
+         !! The selected row if `found`; otherwise the last row that was examined, or unchanged
+      real(wp), intent(inout) :: pivot_value
+         !! The pivot `q(leaving_row, entering_column)`, as selected; left unchanged if not `found`
+      logical, intent(out) :: found
+         !! False if there is no candidate row (rounding errors)
+      real(wp) :: entry, total_cost
+      integer :: j, label, num_candidates
+
+      found = .false.
+      call collect_ratio_candidates(n, klm, toler, entering_column, q, ratios, rows, num_candidates)
+
+      bypass: do
+         if (num_candidates <= 0) return
+         call take_smallest_ratio(ratios, rows, num_candidates, leaving_row)
+         pivot_value = q(leaving_row, entering_column)
+         label = int(q(leaving_row, n + 2))
+         if (phase /= 1) then
+            if (label < 0) then
+               if (restricted(1, -label) == 1) exit bypass
+            else
+               if (restricted(2, label) == 1) exit bypass
+            end if
+         end if
+         label = abs(label)
+         total_cost = costs(1, label) + costs(2, label)
+         if (q(klm + 1, entering_column) - pivot_value*total_cost <= toler) exit bypass
+! BYPASS INTERMEDIATE VERTICES.
+         do j = first_column, n + 1
+            entry = q(leaving_row, j)
+            q(klm + 1, j) = q(klm + 1, j) - entry*total_cost
+            q(leaving_row, j) = -entry
+         end do
+         q(leaving_row, n + 2) = -q(leaving_row, n + 2)
+      end do bypass
+      found = .true.
+   end subroutine select_leaving_row
 
 end module l1_calgo552
