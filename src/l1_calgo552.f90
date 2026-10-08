@@ -142,17 +142,7 @@ contains
       iter = 0
       js = 1
       iq = 0
-! SET UP LABELS IN Q.
-      do j = 1,n
-          q(klm2,j) = real(j, wp)
-      end do
-      label_rows: do i = 1,klm
-          q(i,n2) = real(n + i, wp)
-          if (q(i,n1) >= 0.0_wp) cycle label_rows
-          do j = 1,n2
-              q(i,j) = -q(i,j)
-          end do
-      end do label_rows
+      call set_up_labels(n, klm, q)
 ! SET UP PHASE 1 COSTS.
       iphase = 2
       cu = 0.0_wp
@@ -444,5 +434,32 @@ contains
       error = real(sum, wp)
 
    end subroutine cl1
+
+   subroutine set_up_labels(n, klm, q)
+      !! Label the variables of the simplex tableau `q` and make every right-hand side non-negative.
+      !!
+      !! The unknown `x(j)` is labelled `j` in row `klm+2` of column `j`, and the residual variable
+      !! of row `i` is labelled `n+i` in column `n+2` of row `i`. A row whose right-hand side
+      !! `q(i,n+1)` is negative is multiplied by -1, including its label, so that a negative label
+      !! marks a row (variable) that was flipped.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m` of the matrices `A`, `C`, `E`
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau with at least `klm+2` rows and `n+2` columns
+      integer :: i, j
+
+      do j = 1, n
+         q(klm + 2, j) = real(j, wp)
+      end do
+      label_rows: do i = 1, klm
+         q(i, n + 2) = real(n + i, wp)
+         if (q(i, n + 1) >= 0.0_wp) cycle label_rows
+         do j = 1, n + 2
+            q(i, j) = -q(i, j)
+         end do
+      end do label_rows
+   end subroutine set_up_labels
 
 end module l1_calgo552
