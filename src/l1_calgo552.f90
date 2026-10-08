@@ -100,8 +100,8 @@ contains
 !     ..
 !     .. Local Scalars ..
       real(dp) :: sum
-      real(wp) :: cuv, pivot, sn, tpivot, xmax, xmin, tmp1, zu, zv
-      integer :: i, iq, ii, iimn, iineg, in, iout, iphase, j, jpn, js, kforce, kk
+      real(wp) :: cuv, pivot, tpivot, xmax, xmin, tmp1, zu, zv
+      integer :: i, iq, ii, iineg, in, iout, iphase, j, jpn, js, kforce, kk
       integer :: klm, klm1, klm2, max_iter, n1, n2, nk, nk1, nkl, nkl1, nklm
       logical :: to_phase2, at_optimum, pivot_found
 !     ..
@@ -412,26 +412,7 @@ contains
 !
 ! PREPARE OUTPUT.
 !
-      sum = 0.0_dp
-      x(1:n) = 0.0_wp
-      res(1:klm) = 0.0_wp
-      do i = 1,klm
-          ii = int(q(i,n2))
-          if (ii > 0) then
-              sn = 1.0_wp
-          else
-              ii = -ii
-              sn = -1.0_wp
-          end if
-          if (ii <= n) then
-              x(ii) = sn*q(i,n1)
-          else
-              iimn = ii - n
-              res(iimn) = sn*q(i,n1)
-              if (ii >= n1 .and. ii <= nk) sum = sum + real(q(i,n1), dp)
-          end if
-      end do
-      error = real(sum, wp)
+      call extract_solution(n, k, klm, q, x, res, error)
 
    end subroutine cl1
 
@@ -461,5 +442,53 @@ contains
          end do
       end do label_rows
    end subroutine set_up_labels
+
+   ! The argument limit (6) is ignored for now; to be fixed together with the interface of cl1.
+   ! allow(too-many-arguments)
+   subroutine extract_solution(n, k, klm, q, x, res, error)
+      !! Read the solution of the final simplex tableau `q`.
+      !!
+      !! The row `i` of `q` belongs to the variable whose label is stored in `q(i,n+2)`: a label
+      !! `j <= n` is the unknown `x(j)`, a label `n+i` the residual `res(i)`. A negative label marks
+      !! a variable whose sign was flipped. Variables that are not in the final basis are 0.
+      !! The objective `error` is the sum of the residuals of the `k` equations `A x = b`.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: k
+         !! Number of rows of the matrix `A`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      real(wp), contiguous, intent(in) :: q(:, :)
+         !! Final simplex tableau with at least `klm+2` rows and `n+2` columns
+      real(wp), contiguous, intent(inout) :: x(:)
+         !! Solution: `x(1:n)` is set, the other entries (`size(x) >= n`) are not touched
+      real(wp), contiguous, intent(inout) :: res(:)
+         !! Residuals: `res(1:klm)` is set, the other entries (`size(res) >= klm`) are not touched
+      real(wp), intent(out) :: error
+         !! Sum of the absolute values of the residuals `b - A x`
+      real(dp) :: residual_sum
+      real(wp) :: sign_of_variable
+      integer :: i, label
+
+      residual_sum = 0.0_dp
+      x(1:n) = 0.0_wp
+      res(1:klm) = 0.0_wp
+      do i = 1, klm
+         label = int(q(i, n + 2))
+         if (label > 0) then
+            sign_of_variable = 1.0_wp
+         else
+            label = -label
+            sign_of_variable = -1.0_wp
+         end if
+         if (label <= n) then
+            x(label) = sign_of_variable*q(i, n + 1)
+         else
+            res(label - n) = sign_of_variable*q(i, n + 1)
+            if (label >= n + 1 .and. label <= n + k) residual_sum = residual_sum + real(q(i, n + 1), dp)
+         end if
+      end do
+      error = real(residual_sum, wp)
+   end subroutine extract_solution
 
 end module l1_calgo552
