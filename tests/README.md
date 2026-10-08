@@ -211,6 +211,35 @@ subprocess limits were added, the Fortran interface test alone kept the run aliv
 The guard tests themselves were mutation-tested (5 mutations: 4 give an ordinary failure; removing the
 timeout from `join` makes the test of "returns quickly" hang, which is unavoidable).
 
+## Benchmark: current implementation versus the original
+
+`tests/benchmark_vs_original.py` compares four builds with the same compiler and flags (`-O2` and, as a
+sensitivity check, `-O3`, both with `-ffp-contract=off`): the **original** (`legacy/CALGO552.f`, single
+precision), the **current** sources built in **single** precision (a temporary copy with `wp = c_float`; the
+repository is not touched), the **current** sources in **double** precision (as they ship) and the **frozen
+double** version (`legacy/f90_double/`). Only the Fortran call is timed, round-robin with a rotating order.
+Results are in `tests/benchmarks/vs_original.json` (Apple M1 Pro, GNU Fortran 16.2.0, 11 instances from
+300x15 up to 20000x20).
+
+* **Same results:** current-single is bit-identical to the original (`KODE`, iterations, `x`, `RES`, error) on
+  all 2630 cases (persisted instances and the whole differential fuzz corpus); current-double is
+  bit-identical to the frozen double version on all 2630.
+* **Run time, refactoring only** (current-single / original, minimum of N): geometric mean 0.97 over the 11
+  instances, 0.99-1.03 for every instance with a call time above 1 ms (medians: 0.994 at `-O2`, 1.006 at
+  `-O3`). The refactoring costs nothing measurable. The only visible differences are on a 20 microsecond problem
+  (`kode1_signs_and_constraints`, 0.70-0.78, timer resolution).
+* **Run time, double versus original:** geometric mean 0.99 (minimum), 1.04 (median). One real outlier:
+  `bench_300x100` is 1.27-1.33 times slower in double precision. It is the data size, not the code: the same
+  refactored code in single precision matches the original. In a sweep over the number of rows (n = 100), the
+  time per iteration of double versus single is 1.00 while both tableaus fit in the 128 KB L1 data cache, 1.3-1.6
+  where the single tableau fits and the double one does not (150-300 rows), and about 1.05 beyond.
+* **Iterations:** equal on 7 of 11 instances; the double build takes 236 vs 228 (`bench_5000x30`), 921 vs 936
+  (`bench_cvxpy_script_1000x250`), 166 vs 176 (`big_20000x20`) and 488 vs 445 (`big_4000x60_l5_m30`): a
+  different pivot path from different rounding, 3490 vs 3464 in total (+0.8%).
+* **Accuracy against the HiGHS optimum:** worst relative objective error 2.3e-6 (single, both original and
+  current) versus 1.1e-14 (double). The solutions differ by up to 5.5e-5 relative (`big_20000x20`), the
+  single-precision error.
+
 ## Known property of the legacy code
 
 Single precision limits it: on `bench_cvxpy_script_1000x250` the default `TOLER` (2e-5) ends with
