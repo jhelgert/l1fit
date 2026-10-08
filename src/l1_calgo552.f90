@@ -99,7 +99,6 @@ contains
       integer :: alloc_stat
 !     ..
 !     .. Local Scalars ..
-      real(dp) :: sum
       real(wp) :: cuv, pivot, tpivot, xmax, xmin, tmp1, zu, zv
       integer :: i, iq, ii, iineg, in, iout, iphase, j, jpn, js, kforce, kk
       integer :: klm, klm1, klm2, max_iter, n1, n2, nk, nk1, nkl, nkl1, nklm
@@ -207,30 +206,7 @@ contains
               end do phase2_costs
           end if
 ! COMPUTE THE MARGINAL COSTS.
-          do j = js,n1
-              sum = 0.0_dp
-              do i = 1,klm
-                  ii = int(q(i,n2))
-                  if (ii < 0) then
-                      iineg = -ii
-                      tmp1 = cu(2,iineg)
-                  else
-                      tmp1 = cu(1,ii)
-                  end if
-                  sum = sum + real(q(i,j), dp)*real(tmp1, dp)
-              end do
-              q(klm1,j) = real(sum, wp)
-          end do
-          do j = js,n
-              ii = int(q(klm2,j))
-              if (ii < 0) then
-                  iineg = -ii
-                  tmp1 = cu(2,iineg)
-              else
-                  tmp1 = cu(1,ii)
-              end if
-              q(klm1,j) = q(klm1,j) - tmp1
-          end do
+          call compute_marginal_costs(n, klm, js, cu, q)
 
           iterate: do
 ! DETERMINE THE VECTOR TO ENTER THE BASIS.
@@ -522,5 +498,52 @@ contains
          q(i, column2) = tmp
       end do
    end subroutine swap_columns
+
+   subroutine compute_marginal_costs(n, klm, first_column, costs, q)
+      !! Compute the marginal costs and store them in row `klm+1` of the simplex tableau `q`.
+      !!
+      !! For each column `j` from `first_column` to `n+1` the entry `q(klm+1,j)` is the sum over the
+      !! rows `i` of `q(i,j)` times the cost of the variable that is basic in row `i`. For the
+      !! columns `first_column` to `n` the cost of the (non-basic) variable of the column itself is
+      !! then subtracted. A negative label means that the sign of the variable was flipped, which
+      !! selects the cost of the second sign (`costs(2,-label)`) instead of `costs(1,label)`.
+      !! The sums are accumulated in the higher precision `dp`.
+      integer, intent(in) :: n
+         !! Number of columns of the matrices `A`, `C`, `E`
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      integer, intent(in) :: first_column
+         !! First column of the tableau whose marginal costs are computed
+      real(wp), contiguous, intent(in) :: costs(:, :)
+         !! Costs of the variables, one row for each of the two signs of a variable
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau with at least `klm+2` rows and `n+2` columns; row `klm+1` is set
+      real(dp) :: weighted_sum
+      real(wp) :: variable_cost
+      integer :: i, j, label
+
+      do j = first_column, n + 1
+         weighted_sum = 0.0_dp
+         do i = 1, klm
+            label = int(q(i, n + 2))
+            if (label < 0) then
+               variable_cost = costs(2, -label)
+            else
+               variable_cost = costs(1, label)
+            end if
+            weighted_sum = weighted_sum + real(q(i, j), dp)*real(variable_cost, dp)
+         end do
+         q(klm + 1, j) = real(weighted_sum, wp)
+      end do
+      do j = first_column, n
+         label = int(q(klm + 2, j))
+         if (label < 0) then
+            variable_cost = costs(2, -label)
+         else
+            variable_cost = costs(1, label)
+         end if
+         q(klm + 1, j) = q(klm + 1, j) - variable_cost
+      end do
+   end subroutine compute_marginal_costs
 
 end module l1_calgo552

@@ -177,3 +177,13 @@ grep -inE 'double precision|real *\* *[0-9]|real *\( *[0-9]+ *\)|[0-9][dD][+-]?[
 grep -inE '\((\*|[a-z0-9_,: ]*,\*)\)' src/*.f90        # assumed-size
 grep -inE '^ *use +[a-z_0-9]+ *$' src/*.f90            # use without only
 ```
+
+## Quirks seen in practice
+
+- **C061 false positive on a sibling's dummy name.** If a name is a *local* variable in one procedure of a
+  module and a *dummy argument* of a sibling procedure (for example a local `cu` in the driver and a dummy
+  `cu` in an extracted helper), Fortitude may report `C061 ... missing 'intent'` for the *local*
+  declaration. Renaming the helper's dummy to a descriptive name (`costs`) fixes it, and is better style
+  anyway. Extracting a block into a helper therefore needs distinct dummy names.
+- **Unused `allow` comments are reported** (FORT002), so a suppression that stops being needed is flagged:
+  useful to find every `allow(too-many-arguments)` that can be dropped once an interface is fixed.

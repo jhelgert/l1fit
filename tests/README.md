@@ -115,6 +115,15 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   that reach it. A generator with a redundant equality row and `TOLER=0` reaches it in ~8% of cases, and
   the three seeds that expose the label column are pinned (`PINNED_REDUNDANT_SEEDS`) so that thousands of
   random cases are not needed.
+* **`compute_marginal_costs` (5 mutations)** - 3 killed (first-sign cost for flipped rows, skipped
+  column, shortened correction loop). Two survive, for different reasons:
+  * *Accumulating in `wp` instead of `dp`* is an equivalent mutant while `wp = c_double`. It is killed
+    (63 failures) when `wp` is temporarily set to `c_float`; in that configuration the refactored `src`
+    also reproduces the **original single-precision CALGO 552 bit-for-bit** (2775 passed), i.e. the switch to
+    double precision is the only numerical difference left from the original.
+  * *Using the first-sign cost for a flipped label in the **second** (correction) loop* is reached often
+    (582 times in the corpus) but never observable: in all 582 events `cu(1,j) == cu(2,j)`. Empirical, not
+    a proof; the sign test there looks like defensive symmetry in the original code. Not worth a test.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
