@@ -181,12 +181,7 @@ contains
                   kforce = 0
                   cycle iterate
               end if
-              if (q(klm1,in) /= xmax) then
-                  do i = 1,klm2
-                      q(i,in) = -q(i,in)
-                  end do
-                  q(klm1,in) = xmax
-              end if
+              call orient_entering_column(klm, in, xmax, q)
 !
 ! DETERMINE THE VECTOR TO LEAVE THE BASIS.
 !
@@ -716,5 +711,28 @@ contains
       end do entering_candidates
       at_optimum = (largest_gain <= toler)
    end subroutine select_entering_column
+
+   subroutine orient_entering_column(klm, column, gain, q)
+      !! Bring the selected column of the simplex tableau into the orientation in which the gain
+      !! `gain` was computed.
+      !!
+      !! `select_entering_column` returns the gain of the better of the two signs of a variable. If
+      !! it differs from the marginal cost stored in `q(klm+1,column)`, the selected sign is the
+      !! opposite one: the whole column (including the marginal cost row `klm+1` and the label row
+      !! `klm+2`) is negated and the gain is stored as its marginal cost.
+      integer, intent(in) :: klm
+         !! Total number of rows `k+l+m`
+      integer, intent(in) :: column
+         !! Column of the entering variable
+      real(wp), intent(in) :: gain
+         !! Gain of the selected sign
+      real(wp), contiguous, intent(inout) :: q(:, :)
+         !! Simplex tableau with at least `klm+2` rows
+
+      if (q(klm + 1, column) /= gain) then
+         q(1:klm + 2, column) = -q(1:klm + 2, column)
+         q(klm + 1, column) = gain
+      end if
+   end subroutine orient_entering_column
 
 end module l1_calgo552

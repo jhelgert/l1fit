@@ -145,6 +145,9 @@ The suite is only useful if it fails when the code is wrong, so deliberate bugs 
   each; run with `-x`): both tie-break directions, either restriction flag ignored or read from the wrong
   sign, the forced-original-variables rule and its boundary, the optimality threshold, either loop end,
   the arithmetic of both gains, and the exchange of the two gains for a flipped column.
+* **Sign flip of the entering column (`orient_entering_column`, 6 mutations)** - all killed: inverted
+  condition, column never negated, label row or first row left out of the negation, gain not stored,
+  negated gain stored.
 * **New interface code (12 of 13 verified)** - all six validation conditions (`k<1`, `n<1`, rows, columns,
   `x`, `res`), the status constant, the shim argument order and the early-return reset were killed.
 * **Known gaps**
