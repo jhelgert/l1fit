@@ -1,0 +1,40 @@
+name: CI
+
+# Fast checks on every push and pull request. The wheels are built by wheels.yml.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+
+      # --no-install-project: the linters need no compiler, so the extension is not built here.
+      - name: Install the development tools
+        run: uv sync --no-install-project --python 3.12
+
+      - name: ruff check
+        run: uv run --no-sync ruff check
+
+      - name: ruff format
+        run: uv run --no-sync ruff format --check
+
+      - name: pyrefly
+        run: uv run --no-sync pyrefly check
+
+      - name: fortitude
+        run: uv run --no-sync fortitude check --preview src/

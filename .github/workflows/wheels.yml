@@ -1,0 +1,123 @@
+name: Wheels
+
+# Builds the source distribution and one stable-ABI (abi3) wheel per platform, then tests every wheel
+# on every supported Python version. Windows is not built yet (it needs LFortran, which is unverified).
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Build the sdist
+        run: uv build --sdist --out-dir dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  wheels:
+    name: Wheel (${{ matrix.name }})
+    needs: sdist
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: "Linux x86_64", runner: ubuntu-24.04, artifact: wheel-linux-x86_64}
+          - {name: "Linux aarch64", runner: ubuntu-24.04-arm, artifact: wheel-linux-aarch64}
+          - {name: "macOS arm64", runner: macos-15, artifact: wheel-macos-arm64}
+          - {name: "macOS x86_64", runner: macos-15-intel, artifact: wheel-macos-x86_64}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: sdist
+          path: sdist
+
+      - uses: astral-sh/setup-uv@v10
+
+      # The Linux wheels are built in a manylinux container, where the Fortran compiler has to be installed
+      # (pyproject.toml, [tool.cibuildwheel.linux]). On macOS the build uses the gfortran of the runner image;
+      # the test job prints its version, so a runner image without one fails visibly.
+      - name: Build the wheel from the sdist
+        uses: pypa/cibuildwheel@v4.3.0
+        with:
+          package-dir: sdist/*.tar.gz
+          output-dir: wheelhouse
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  test:
+    name: Test (${{ matrix.runner }}, Python ${{ matrix.python }})
+    needs: wheels
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel]
+        python: ["3.12", "3.13", "3.14", "3.15"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: ${{ matrix.python }}
+
+      # The reference implementations of the test-suite are compiled with gfortran when the tests start.
+      - name: Install gfortran (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gfortran
+
+      - name: Check gfortran
+        run: gfortran --version
+
+      - name: Select the wheel of this platform
+        id: platform
+        shell: bash
+        run: |
+          case "${{ matrix.runner }}" in
+            ubuntu-24.04) echo "artifact=wheel-linux-x86_64" >> "$GITHUB_OUTPUT" ;;
+            ubuntu-24.04-arm) echo "artifact=wheel-linux-aarch64" >> "$GITHUB_OUTPUT" ;;
+            macos-15) echo "artifact=wheel-macos-arm64" >> "$GITHUB_OUTPUT" ;;
+            macos-15-intel) echo "artifact=wheel-macos-x86_64" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ steps.platform.outputs.artifact }}
+          path: wheelhouse
+
+      # An environment that contains the installed wheel, not the source tree (python/ is not on the path).
+      - name: Install the wheel and the test dependencies
+        run: |
+          uv venv --python ${{ matrix.python }} .test-venv
+          uv pip install --python .test-venv/bin/python wheelhouse/*.whl numpy scipy pytest
+          .test-venv/bin/python -c "import l1fit; print(l1fit.__file__)"
+
+      - name: Check the installed wheel
+        run: .test-venv/bin/python tests/check_installed_wheel.py
+
+      - name: Run the test-suite against the installed wheel
+        run: .test-venv/bin/python -m pytest tests -q -p no:cacheprovider

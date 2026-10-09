@@ -22,6 +22,7 @@ classifiers = [
 
 [dependency-groups]
 dev = [
+    "fortitude-lint",  # linter of the Fortran sources (fortitude.toml)
     "nanobind>=2.9",  # stub generation test
     "pyrefly",
     "pytest>=8",
@@ -44,6 +45,7 @@ sdist.include = [
     "src/*.f90",
     "src/*.cpp",
     "CMakeLists.txt",
+    "cmake/*.cmake",
     "/README.md",
     "/pyproject.toml",
 ]
@@ -59,6 +61,7 @@ sdist.exclude = [
     "/tests",
     "/legacy",
     "/.agents",
+    "/.github",
     "/uv.lock",
     "/fortitude.toml",
 ]
@@ -100,3 +103,15 @@ project-includes = ["python"]
 project-excludes = ["**/__pycache__", "**/.venv/**", "**/build/**"]
 search-path = ["python"]
 python-version = "3.12"
+
+# Wheels (cibuildwheel, see .github/workflows/wheels.yml). The extension uses the stable ABI (one wheel per
+# platform for Python >= 3.12) and needs no Fortran runtime library, so there is nothing to bundle.
+[tool.cibuildwheel]
+build = "cp312-*"
+build-frontend = "uv"
+test-groups = ["dev"]
+test-command = "python {project}/tests/check_installed_wheel.py"
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+repair-wheel-command = ""  # no external libraries: nothing to bundle; tests/check_installed_wheel.py checks it
