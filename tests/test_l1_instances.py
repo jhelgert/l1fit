@@ -1,8 +1,8 @@
-"""Regression tests for every L1 solver implementation (legacy oracle now, refactor / extension later).
+"""Correctness tests of the L1 solver on the persisted instances (``tests/instances``).
 
-Run (repository root)::
-
-    uv run --no-project --with numpy --with scipy --with pytest pytest tests -v
+They run against the Fortran sources (``src``) and the installed package (``extension``), see
+``conftest.py``. Nothing here compares with another implementation: the answers are checked against an
+independent HiGHS reference optimum, against feasibility and against closed-form solutions.
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ def test_iteration_limit_is_respected(solver):
 
 
 # ---------------------------------------------------------------------------------------
-# Metamorphic properties: cheap invariants that a refactor must not break.
+# Metamorphic properties: cheap invariants of the problem that every correct solver must satisfy.
 # ---------------------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "name", ["rand_20x3", "rand_eq_ineq_60x6_l2_m8", "rand_300x15_l3_m20"]
@@ -114,35 +114,11 @@ def test_positive_scaling_of_the_whole_problem(solver, name):
         f=s * inst.f,
         ref_x=None,
         ref_objective=s * inst.ref_objective,
-        toler=None,
     )
-    r0, r1 = (
-        solver.solve(inst),
-        solver.solve(scaled, toler=s * 2e-5 if solver.precision == "single" else None),
-    )
+    r0, r1 = solver.solve(inst), solver.solve(scaled)
     assert r0.kode == r1.kode == KODE_OPTIMAL
     assert r1.error == pytest.approx(
         s * r0.error, rel=TOLERANCES[solver.precision].objective
     )
     tol = TOLERANCES[solver.precision].x
     assert np.allclose(r1.x, r0.x, rtol=tol, atol=tol)
-
-
-# ---------------------------------------------------------------------------------------
-# Golden values: implementations flagged ``matches_legacy`` must reproduce the recorded legacy output.
-# ---------------------------------------------------------------------------------------
-def test_oracle_reproduces_golden_output(solver, inst):
-    """Exact reproduction of the legacy output (oracle: guards the build; others: guards refactors).
-
-    Iteration counts of the single-precision simplex can legitimately differ between compilers or
-    CPU architectures; if this fails *only* on a new platform, regenerate with
-    ``uv run tests/generate_instances.py`` and review the manifest diff.
-    """
-    if not solver.matches_legacy:
-        pytest.skip("golden values describe the legacy single-precision implementation")
-    r = solver.solve(inst)
-    g = inst.legacy
-    assert r.kode == int(g["kode"])
-    assert r.iterations == int(g["iterations"])
-    assert r.error == pytest.approx(float(g["error"]), rel=1e-6, abs=1e-6)
-    assert np.allclose(r.x, g["x"], rtol=1e-5, atol=1e-5)

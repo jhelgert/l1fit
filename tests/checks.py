@@ -6,7 +6,7 @@ Nothing here knows how the answer was computed.  A solution is accepted when
   * that objective equals the independent HiGHS reference optimum,
   * ``x`` satisfies equalities, inequalities and sign restrictions,
   * the reported residual vector matches ``b-Ax``, ``d-Cx``, ``f-Ex``.
-Tolerances depend on the working precision of the implementation under test.
+
 """
 
 from __future__ import annotations
@@ -26,7 +26,6 @@ class Tolerances:
 
 
 TOLERANCES = {
-    "single": Tolerances(objective=1e-4, feasibility=1e-3, x=2e-3),
     "double": Tolerances(objective=1e-8, feasibility=1e-7, x=1e-6),
 }
 

@@ -9,14 +9,13 @@ optionally with sign restrictions (``KODE = 1``): ``xsign[j]`` in {-1, 0, 1} res
 
 Instances are built with ``numpy.random.Generator(PCG64(seed))`` (stable stream) and persisted to
 ``tests/instances/<name>.npz`` by ``generate_instances.py`` together with *reference values*
-(``ref_*``, computed independently with SciPy/HiGHS) and *golden values* (``legacy_*``, produced
-by the frozen legacy oracle).  Tests only read the persisted files, so they stay valid even if
-NumPy's RNG or the Fortran code changes.
+(``ref_*``, computed independently with SciPy/HiGHS).  Tests only read the persisted files, so they
+stay valid even if NumPy's RNG or the Fortran code changes.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -45,9 +44,6 @@ class Instance:
     ressign: np.ndarray | None = None
     max_iter: int | None = None
     """Iteration limit handed to the solver (None -> 10*(k+l+m), the header suggestion)."""
-    toler: float | None = None
-    """TOLER handed to the solver (None -> adapter default).  The single-precision legacy build needs
-    a looser value (1e-3) on large ill-conditioned problems, see README."""
     unique_x: bool = True
     """False when the optimal x is not unique (only the objective value can be compared)."""
     expected_kode: int = KODE_OPTIMAL
@@ -56,8 +52,6 @@ class Instance:
     """Optimal objective from SciPy/HiGHS in float64 (nan if infeasible / not solved)."""
     ref_status: str = ""
     ref_x: np.ndarray | None = None
-    legacy: dict = field(default_factory=dict)
-    """Golden output of the frozen legacy oracle: kode, iterations, error, x."""
 
     # ------------------------------------------------------------------------------------
     @property
@@ -91,7 +85,6 @@ class Instance:
             "E": self.E,
             "f": self.f,
             "max_iter": -1 if self.max_iter is None else self.max_iter,
-            "toler": float("nan") if self.toler is None else self.toler,
             "unique_x": self.unique_x,
             "expected_kode": self.expected_kode,
             "ref_objective": self.ref_objective,
@@ -103,8 +96,6 @@ class Instance:
             payload["ressign"] = self.ressign
         if self.ref_x is not None:
             payload["ref_x"] = self.ref_x
-        for key, value in self.legacy.items():
-            payload[f"legacy_{key}"] = value
         np.savez_compressed(path, **payload)
         return path
 
@@ -112,12 +103,6 @@ class Instance:
     def load(cls, path: Path) -> Instance:
         with np.load(path, allow_pickle=False) as z:
             max_iter = int(z["max_iter"])
-            toler = float(z["toler"])
-            legacy = {
-                k[len("legacy_") :]: z[k][()] if z[k].ndim == 0 else z[k]
-                for k in z.files
-                if k.startswith("legacy_")
-            }
             return cls(
                 name=str(z["name"]),
                 description=str(z["description"]),
@@ -131,13 +116,11 @@ class Instance:
                 xsign=z["xsign"] if "xsign" in z.files else None,
                 ressign=z["ressign"] if "ressign" in z.files else None,
                 max_iter=None if max_iter < 0 else max_iter,
-                toler=None if np.isnan(toler) else toler,
                 unique_x=bool(z["unique_x"]),
                 expected_kode=int(z["expected_kode"]),
                 ref_objective=float(z["ref_objective"]),
                 ref_status=str(z["ref_status"]),
                 ref_x=z["ref_x"] if "ref_x" in z.files else None,
-                legacy=legacy,
             )
 
 
@@ -492,9 +475,8 @@ def build_all() -> list[Instance]:
         _random_problem("bench_5000x30", "Benchmark: 5000 x 30", 105, 5000, 30, tags=b_)
     )
 
-    # Same sizes as tests/test_cvxpy.py (1000 x 250, 10 eq, 200 ineq), but a feasible problem:
-    # the Gaussian data are the same, ``b`` is used (the script passes ``f`` as ``b`` by mistake).
-    # No hidden feasible point is planted: with 10 equalities and 200 random inequalities in 250
+    # 1000 x 250 with 10 equalities and 200 inequalities, pure Gaussian data (the size of a script that
+    # was used to try CVXPY out). No hidden feasible point is planted: with 10 equalities and 200 random inequalities in 250
     # variables the feasible set is non-empty with overwhelming probability (verified at generation).
     rs = np.random.RandomState(0)
     A = rs.randn(1000, 250)
@@ -506,7 +488,7 @@ def build_all() -> list[Instance]:
     inst.append(
         Instance(
             "bench_cvxpy_script_1000x250",
-            "Sizes/data of tests/test_cvxpy.py (1000x250, 10 eq, 200 ineq)",
+            "A 1000x250 problem with 10 equality and 200 inequality constraints",
             A,
             b,
             C,
@@ -514,7 +496,6 @@ def build_all() -> list[Instance]:
             E,
             f,
             tags=b_,
-            toler=1e-3,  # legacy single precision breaks down (KODE=2) with the default 2e-5
         )
     )
     return inst

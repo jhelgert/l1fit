@@ -6,8 +6,10 @@
 
 For every instance this stores
   * the problem data,
-  * an independent float64 *reference* optimum from SciPy/HiGHS (``ref_*``), and
-  * the *golden* output of the frozen legacy oracle ``legacy/CALGO552.f`` (``legacy_*``).
+  * an independent float64 *reference* optimum from SciPy/HiGHS (``ref_*``).
+
+Every instance is also solved with the Fortran sources (``fortran_src.py``) to check that the expected exit
+code and the reference optimum are consistent with the solver.
 
 Run from the repository root::
 
@@ -30,7 +32,7 @@ from scipy.optimize import linprog
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from instances import INSTANCE_DIR, Instance, build_all
-from legacy_cl1 import LegacyCL1
+from fortran_src import SrcCL1
 
 
 def reference_solution(inst: Instance) -> tuple[str, float, np.ndarray | None]:
@@ -76,7 +78,7 @@ def reference_solution(inst: Instance) -> tuple[str, float, np.ndarray | None]:
 
 
 def main() -> None:
-    oracle = LegacyCL1()
+    solver = SrcCL1()
     manifest = []
     for inst in build_all():
         status, obj, x = reference_solution(inst)
@@ -89,19 +91,10 @@ def main() -> None:
             )
 
         t0 = time.perf_counter()
-        res = oracle.solve(inst)
+        res = solver.solve(inst)
         elapsed = time.perf_counter() - t0
         if res.kode != inst.expected_kode:
-            raise SystemExit(
-                f"{inst.name}: legacy KODE={res.kode}, expected {inst.expected_kode}"
-            )
-        inst.legacy = {
-            "kode": res.kode,
-            "iterations": res.iterations,
-            "error": res.error,
-            "x": res.x,
-            "seconds": elapsed,
-        }
+            raise SystemExit(f"{inst.name}: solver KODE={res.kode}, expected {inst.expected_kode}")
         inst.save()
 
         manifest.append(
@@ -115,10 +108,6 @@ def main() -> None:
                 "n": inst.n,
                 "ref_status": status,
                 "ref_objective": None if np.isnan(obj) else obj,
-                "legacy_kode": res.kode,
-                "legacy_iterations": res.iterations,
-                "legacy_error": res.error,
-                "legacy_seconds": round(elapsed, 4),
             }
         )
         rel = (
@@ -128,7 +117,7 @@ def main() -> None:
         )
         print(
             f"{inst.name:32s} {inst.k:5d}x{inst.n:<4d} l={inst.l:<3d} m={inst.m:<4d} "
-            f"ref={obj:12.6f} legacy={res.error:12.6f} (rel diff {rel:.1e}) "
+            f"ref={obj:12.6f} solver={res.error:12.6f} (rel diff {rel:.1e}) "
             f"kode={res.kode} iter={res.iterations:6d} {elapsed * 1e3:8.1f} ms"
         )
 

@@ -1,6 +1,6 @@
 """Adapter that runs the test instances through the public Python interface ``l1fit.solve_l1``.
 
-Unlike the ``ctypes`` adapters of ``legacy_cl1.py`` this exercises the whole stack: argument
+Unlike the ``ctypes`` adapters of ``fortran_src.py`` this exercises the whole stack: argument
 validation, packing, the nanobind binding (``l1fit._core``) and the Fortran solver. It is registered in
 ``solvers.available_solvers`` only if the package is installed (``uv sync`` builds it), so the
 Fortran-only tests keep working without it.
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from legacy_cl1 import DEFAULT_TOLER_DOUBLE
+from fortran_src import DEFAULT_TOLER_DOUBLE
 from solvers import MAX_HANGS, Result, SolverHang, call_with_timeout, solve_timeout
 
 
@@ -19,8 +19,6 @@ class ExtensionCL1:
 
     name = "extension"
     precision = "double"
-    is_oracle = False
-    matches_legacy = False  # compared with the frozen *double* oracle by the differential tests
 
     def __init__(self) -> None:
         import l1fit  # noqa: PLC0415 - optional dependency

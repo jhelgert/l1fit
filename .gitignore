@@ -5,3 +5,12 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+
+# Material that was only needed while refactoring the legacy CALGO 552 code: the frozen original and the
+# first modernized version (test oracles), the adapters and benchmarks that compared against them.
+# They stay on disk but are not part of the repository any more (the history keeps them).
+/legacy/
+/tests/legacy_cl1.py
+/tests/benchmark.py
+/tests/benchmark_vs_original.py
+/tests/benchmarks/

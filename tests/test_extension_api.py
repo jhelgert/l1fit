@@ -1,7 +1,7 @@
 """Tests of the Python package ``l1fit``: the typed interface and the contract of the binding.
 
-The numerical correctness and the bit-for-bit agreement with the frozen Fortran oracles is checked by
-the adapter-based tests (``extension_adapter.py``, ``test_l1_instances.py``, ``test_differential.py``).
+The numerical correctness is checked by the adapter-based tests (``extension_adapter.py``,
+``test_l1_instances.py``).
 These tests cover what only the Python interface and the binding can get wrong: argument validation,
 optional arguments, copies, layouts, threads and the type stub.
 """

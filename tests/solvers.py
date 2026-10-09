@@ -1,18 +1,13 @@
 """Solver adapters used by the test-suite and the benchmark script.
 
-Every adapter exposes the same tiny interface so that tests are written once
-and run against the frozen legacy oracle today and against the modernized
-Fortran / CPython extension later:
+Every adapter exposes the same tiny interface, so that the tests are written once and run against
+the Fortran sources (``fortran_src.py``) and the installed Python package (``extension_adapter.py``):
 
     adapter.name         -> str
-    adapter.precision    -> "single" | "double"   (selects comparison tolerances)
-    adapter.is_oracle    -> bool  (True only for the frozen legacy build)
-    adapter.matches_legacy -> bool (True while exact reproduction of the legacy output is expected:
-                            enables the golden and differential tests)
+    adapter.precision    -> "double"   (selects the comparison tolerances)
     adapter.solve(inst)  -> Result
 
-To plug in a new implementation, write an adapter and register it in
-``available_solvers``.
+To plug in a new implementation, write an adapter and register it in ``available_solvers``.
 """
 
 from __future__ import annotations
@@ -89,13 +84,9 @@ def call_with_timeout(function: Callable[[], None], timeout: float) -> None:
 
 def available_solvers() -> dict[str, object]:
     """Return all solver adapters that can be built/imported in this environment."""
-    from legacy_cl1 import FrozenDoubleCL1, LegacyCL1, SrcCL1
+    from fortran_src import SrcCL1
 
-    solvers: dict[str, object] = {
-        "legacy": LegacyCL1(),
-        "legacy_double": FrozenDoubleCL1(),
-        "src": SrcCL1(),
-    }
+    solvers: dict[str, object] = {"src": SrcCL1()}
 
     # The bounds-checked build (``SrcCheckedCL1``) is deliberately not registered here: a run-time
     # check failure aborts the process, so it runs in a child process, see test_checked_build.py.

@@ -1,4 +1,4 @@
-"""Runs the correctness and differential tests against the bounds-checked build in a child process.
+"""Runs the correctness tests against the bounds-checked build in a child process.
 
 ``SrcCheckedCL1`` is ``src/`` compiled with ``-fcheck=all -O0`` (array bounds, array temporaries,
 uninitialised pointers, ...).  A violated check makes the Fortran run-time abort the *whole* process,
@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 CHILD_TIMEOUT = 300  # seconds; the child normally needs about 10 s
 
 
-def test_bounds_checked_build_passes_all_instances_and_fuzz_cases():
+def test_bounds_checked_build_passes_all_instances():
     env = dict(os.environ, L1FIT_CHECKED_CHILD="1")
     try:
         child = subprocess.run(

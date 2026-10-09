@@ -13,7 +13,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from legacy_cl1 import BUILD_DIR, ROOT
+from fortran_src import BUILD_DIR, ROOT
 
 PROGRAM = Path(__file__).resolve().parent / "fortran" / "check_cl1_interface.f90"
 RUN_TIMEOUT = 60  # seconds; the program normally needs a fraction of a second

@@ -14,7 +14,7 @@ import time
 
 import pytest
 
-import legacy_cl1
+import fortran_src
 import solvers
 from instances import load_instances
 from solvers import SolverHang, call_with_timeout
@@ -48,8 +48,8 @@ def test_a_call_stuck_in_c_becomes_solver_hang_quickly():
     assert time.perf_counter() - start < 5.0, "the guard must not wait for the stuck call"
 
 
-class StuckAdapter(legacy_cl1.LegacyCL1):
-    """The frozen oracle whose foreign call never returns (it sleeps 30 s inside C)."""
+class StuckAdapter(fortran_src.SrcCL1):
+    """The Fortran adapter whose foreign call never returns (it sleeps 30 s inside C)."""
 
     name = "stuck"
 

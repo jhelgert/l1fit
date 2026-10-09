@@ -9,9 +9,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# tests/test_cvxpy.py is a standalone demo script (no test functions, needs cvxpy at import time).
-collect_ignore = ["test_cvxpy.py"]
-
 from instances import load_instances
 from solvers import available_solvers
 
@@ -30,5 +27,5 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
 @pytest.fixture(scope="session")
 def all_solvers():
-    """All adapters by name (the frozen oracles are ``legacy`` and ``legacy_double``)."""
+    """All adapters by name (``src``: the Fortran sources, ``extension``: the installed package)."""
     return _SOLVERS
