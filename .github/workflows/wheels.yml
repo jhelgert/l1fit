@@ -3,6 +3,7 @@ name: Wheels
 # Builds the source distribution and one stable-ABI (abi3) wheel per platform, then tests every wheel
 # on every supported Python version. Windows (x86_64 only) uses MSVC for the C++ and MinGW-w64 gfortran for the
 # Fortran; that is possible because the Fortran code needs no runtime library (see CMakeLists.txt).
+# A tag "vX.Y.Z" that matches the version in pyproject.toml publishes the sdist and the wheels to PyPI (last job).
 on:
   push:
     branches: [main]
@@ -15,7 +16,7 @@ permissions:
 
 concurrency:
   group: wheels-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}  # never cancel a release half-way
 
 jobs:
   sdist:
@@ -164,3 +165,46 @@ jobs:
       - name: Run the test-suite against the installed wheel
         shell: bash
         run: '"$TEST_PYTHON" -m pytest tests -q -p no:cacheprovider'
+
+  # Trusted publishing (OpenID Connect): no API token is stored anywhere. One-time set-up on pypi.org, under
+  # "Publishing" of the project (or as a pending publisher before the first release): owner jhelgert,
+  # repository l1fit, workflow wheels.yml, environment pypi. Create the environment "pypi" in the repository
+  # settings; adding required reviewers there turns every release into a manual approval.
+  publish:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [sdist, wheels, test]
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/l1fit/
+    permissions:
+      id-token: write  # the only job that may request the OIDC token
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "{sdist,wheel-*}"
+          merge-multiple: true
+          path: dist
+
+      - name: Check the tag and the files
+        shell: bash
+        run: |
+          version="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the version $version in pyproject.toml"
+            exit 1
+          fi
+          ls -l dist
+          expected=6   # one sdist and the wheels of Linux x86_64/aarch64, macOS arm64/x86_64 and Windows x86_64
+          actual="$(find dist -type f \( -name '*.whl' -o -name '*.tar.gz' \) | wc -l)"
+          if [ "$actual" -ne "$expected" ] || [ "$(find dist -type f | wc -l)" -ne "$expected" ]; then
+            echo "::error::expected $expected files in dist/, found $actual distributions"
+            exit 1
+          fi
+
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          packages-dir: dist

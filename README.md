@@ -169,3 +169,21 @@ uv run python -m nanobind.stubgen -m l1fit._core -o python/l1fit/_core.pyi   # a
 
 Ruff and pyrefly check the Python package only (`python/`); Fortitude lints the Fortran (`src/`); see
 `pyproject.toml` and `fortitude.toml`.
+
+## Releasing
+
+Pushing a tag `vX.Y.Z` that matches `version` in `pyproject.toml` publishes to PyPI. The `Wheels` workflow builds
+the sdist and the five wheels, runs the tests against every wheel, and only then runs the `publish` job, which
+checks the tag and the file list and uploads through
+[trusted publishing](https://docs.pypi.org/trusted-publishers/) (no API token is stored).
+
+```bash
+# 1. bump `version` in pyproject.toml, commit and push to main, wait for green checks
+# 2.
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+One-time set-up: on pypi.org add a (pending) publisher for the project `l1fit` with owner `jhelgert`, repository
+`l1fit`, workflow `wheels.yml` and environment `pypi`, and create the environment `pypi` in the repository settings
+(required reviewers there make each release a manual approval). A published version cannot be replaced; to try the
+pipeline first, use the same set-up on test.pypi.org.
