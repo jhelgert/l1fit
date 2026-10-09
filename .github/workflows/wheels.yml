@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
 
       - name: Build the sdist
         run: uv build --sdist --out-dir dist
@@ -52,7 +52,7 @@ jobs:
           name: sdist
           path: sdist
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
 
       # The Linux wheels are built in a manylinux container, where the Fortran compiler has to be installed
       # (pyproject.toml, [tool.cibuildwheel.linux]). On macOS the build uses the gfortran of the runner image;
@@ -81,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           python-version: ${{ matrix.python }}
 
