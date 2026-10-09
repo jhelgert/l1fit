@@ -1,6 +1,6 @@
 # Fails if the Fortran object files refer to symbols of the GNU Fortran runtime (libgfortran, libquadmath).
-# Usage: cmake -DNM=<nm> "-DOBJECTS=<object|object|...>" -P check_no_fortran_runtime.cmake
-string(REPLACE "|" ";" object_files "${OBJECTS}")
+# Usage: cmake -DNM=<nm> "-DOBJECTS=<object,object,...>" -P check_no_fortran_runtime.cmake
+string(REPLACE "," ";" object_files "${OBJECTS}")
 set(offenders "")
 foreach(object_file IN LISTS object_files)
     execute_process(

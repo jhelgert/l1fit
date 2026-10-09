@@ -86,7 +86,7 @@ find_program(L1FIT_NM nm)
 if(L1FIT_FORTRAN_RUNTIME STREQUAL "NONE" AND L1FIT_NM AND CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     add_custom_command(TARGET _core POST_BUILD
         COMMAND "${CMAKE_COMMAND}"
-            "-DNM=${L1FIT_NM}" "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:l1fit_fortran>,|>"
+            "-DNM=${L1FIT_NM}" "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:l1fit_fortran>,$<COMMA>>"
             -P "${CMAKE_SOURCE_DIR}/cmake/check_no_fortran_runtime.cmake"
         COMMENT "Checking that the Fortran code needs no Fortran runtime library"
         VERBATIM)
