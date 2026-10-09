@@ -9,6 +9,7 @@ every adapter runs its foreign call in a worker thread with a wall-clock limit, 
 from __future__ import annotations
 
 import ctypes
+import sys
 import time
 
 import pytest
@@ -18,7 +19,14 @@ import solvers
 from instances import load_instances
 from solvers import SolverHang, call_with_timeout
 
-libc = ctypes.CDLL(None)  # a foreign call that blocks inside C (and releases the GIL), like a stuck Fortran loop
+
+
+def block_in_c(seconds: int) -> None:
+    """A foreign call that blocks inside C (and releases the GIL), like a stuck Fortran loop."""
+    if sys.platform == "win32":
+        ctypes.windll.kernel32.Sleep(seconds * 1000)  # type: ignore[attr-defined]  # milliseconds
+    else:
+        ctypes.CDLL(None).sleep(seconds)
 
 
 def test_returns_normally_and_propagates_exceptions():
@@ -36,7 +44,7 @@ def test_returns_normally_and_propagates_exceptions():
 def test_a_call_stuck_in_c_becomes_solver_hang_quickly():
     start = time.perf_counter()
     with pytest.raises(SolverHang, match="did not return"):
-        call_with_timeout(lambda: libc.sleep(30), timeout=0.3)
+        call_with_timeout(lambda: block_in_c(30), timeout=0.3)
     assert time.perf_counter() - start < 5.0, "the guard must not wait for the stuck call"
 
 
@@ -46,7 +54,7 @@ class StuckAdapter(legacy_cl1.LegacyCL1):
     name = "stuck"
 
     def _invoke(self, *args) -> None:
-        libc.sleep(30)
+        block_in_c(30)
 
 
 def test_adapter_reports_a_hang_then_fails_fast(monkeypatch):
