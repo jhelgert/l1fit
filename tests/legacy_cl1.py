@@ -23,6 +23,7 @@ import ctypes
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -126,6 +127,19 @@ def build_library(sources: list[Path], fflags: list[str] | None = None) -> Path:
     return lib
 
 
+def load_library(path: Path) -> ctypes.CDLL:
+    """Load a library built by ``build_library``.
+
+    On Windows, Python does not search the PATH for the DLLs that a library depends on: the directory of
+    the compiler (libgfortran, libgcc_s, libquadmath of a bounds-checked build) has to be added explicitly.
+    """
+    if sys.platform == "win32":
+        compiler = shutil.which(os.environ.get("FC", "gfortran"))
+        if compiler is not None:
+            os.add_dll_directory(str(Path(compiler).resolve().parent))
+    return ctypes.CDLL(str(path))
+
+
 class FortranCL1:
     """Base adapter: packs an instance into ``Q``/``X``/``RES``, calls the library, unpacks the result.
 
@@ -156,7 +170,7 @@ class FortranCL1:
         )
         self._c_real = ctypes.c_float if single else ctypes.c_double
         self._hangs = 0  # number of calls that did not return in time
-        self._lib = ctypes.CDLL(str(build_library(sources, fflags)))
+        self._lib = load_library(build_library(sources, fflags))
         self._real_arr = np.ctypeslib.ndpointer(dtype=self.dtype, flags="F_CONTIGUOUS")
         self._int_arr = np.ctypeslib.ndpointer(dtype=np.int32, flags="F_CONTIGUOUS")
         self._int_ptr = ctypes.POINTER(ctypes.c_int)
