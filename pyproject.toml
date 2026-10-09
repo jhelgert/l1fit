@@ -79,7 +79,7 @@ cache-keys = [
 line-length = 100
 target-version = "py312"
 src = ["python"]
-extend-exclude = ["tests", "legacy", "build", "python/l1fit/_core.pyi"]  # _core.pyi is generated
+extend-exclude = ["tests", "scripts", "legacy", "build", "python/l1fit/_core.pyi"]  # _core.pyi is generated
 
 [tool.ruff.lint]
 select = [
