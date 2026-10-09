@@ -1,6 +1,19 @@
 cmake_minimum_required(VERSION 3.26)
 
-project(l1fit LANGUAGES CXX Fortran)
+project(l1fit LANGUAGES CXX)
+
+# On Windows the C++ is built with MSVC and the Fortran with MinGW-w64 gfortran. That works because the Fortran
+# code needs no runtime library (see below): its object files are linked by the MSVC linker only. CMake gives
+# the Fortran compiler check the MSVC linker flags (/machine:x64), which gfortran rejects, so they are
+# emptied while the language is enabled.
+if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set(l1fit_saved_exe_linker_flags "${CMAKE_EXE_LINKER_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "")
+    enable_language(Fortran)
+    set(CMAKE_EXE_LINKER_FLAGS "${l1fit_saved_exe_linker_flags}")
+else()
+    enable_language(Fortran)
+endif()
 
 # The Fortran solver is compiled into object files that are added to the Python extension module.
 # (An OBJECT library, not a STATIC one: linking a Fortran static library makes CMake add the Fortran
