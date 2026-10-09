@@ -57,10 +57,16 @@ jobs:
       # The Linux wheels are built in a manylinux container, where the Fortran compiler has to be installed
       # (pyproject.toml, [tool.cibuildwheel.linux]). On macOS the build uses the gfortran of the runner image;
       # the test job prints its version, so a runner image without one fails visibly.
+      # package-dir does not expand globs, so resolve the sdist file name first.
+      - name: Locate the sdist
+        id: sdist
+        shell: bash
+        run: echo "path=$(ls sdist/*.tar.gz)" >> "$GITHUB_OUTPUT"
+
       - name: Build the wheel from the sdist
         uses: pypa/cibuildwheel@v4.3.0
         with:
-          package-dir: sdist/*.tar.gz
+          package-dir: ${{ steps.sdist.outputs.path }}
           output-dir: wheelhouse
 
       - uses: actions/upload-artifact@v7
