@@ -7,6 +7,9 @@ name = "l1fit"
 version = "0.1.0"
 description = "Fast constrained L1 curve fitting: a modernized Fortran implementation of ACM TOMS algorithm 552"
 readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [{ name = "Jonathan Helgert", email = "github@helgert.ch" }]
 requires-python = ">=3.12"
 dependencies = ["numpy>=2.0"]
 classifiers = [
@@ -52,6 +55,7 @@ sdist.include = [
     "CMakeLists.txt",
     "cmake/*.cmake",
     "/README.md",
+    "/LICENSE",
     "/pyproject.toml",
     "/scripts/check_installed_wheel.py",  # run by the wheel jobs as the cibuildwheel test-command
 ]

@@ -147,7 +147,8 @@ What was done:
 * **Packaging:** the Python extension, wheels for all major platforms, and a test suite that checks every answer
   against an independent HiGHS reference.
 
-The history of the repository contains the original and the intermediate steps.
+The history of the repository contains the original and the intermediate steps. The algorithm and the original
+Fortran are the work of Barrodale and Roberts and are credited as such.
 
 ## Development
 
@@ -187,3 +188,7 @@ One-time set-up: on pypi.org add a (pending) publisher for the project `l1fit` w
 `l1fit`, workflow `wheels.yml` and environment `pypi`, and create the environment `pypi` in the repository settings
 (required reviewers there make each release a manual approval). A published version cannot be replaced; to try the
 pipeline first, use the same set-up on test.pypi.org.
+
+## License
+
+BSD 3-Clause, see `LICENSE`.
