@@ -13,6 +13,7 @@ Standard library and numpy only, so that it runs in a bare test environment.
 from __future__ import annotations
 
 import platform
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -30,7 +31,41 @@ ALLOWED_PREFIXES = {
         "libc.so", "libm.so", "libdl.so", "libpthread.so", "librt.so", "libutil.so",
         "ld-linux", "linux-vdso", "libstdc++.so", "libgcc_s.so",
     ),
+    # Lower-case DLL names. The MinGW runtime (libgfortran, libgcc_s_seh, libquadmath, libwinpthread) is not
+    # listed on purpose. vcruntime140 and msvcp140 are the Visual C++ runtime that CPython itself needs.
+    "Windows": ("kernel32.dll", "python3.dll", "vcruntime140", "msvcp140", "api-ms-win-crt-"),
 }
+
+
+def pe_imported_dlls(module: Path) -> list[str]:
+    """Names of the DLLs that a Windows (PE) binary imports, read from its import directory."""
+    data = module.read_bytes()
+    pe = struct.unpack_from("<I", data, 0x3C)[0]
+    assert data[pe : pe + 4] == b"PE\0\0", f"not a PE file: {module}"
+    section_count = struct.unpack_from("<H", data, pe + 6)[0]
+    optional_size = struct.unpack_from("<H", data, pe + 20)[0]
+    optional = pe + 24
+    is_pe32_plus = struct.unpack_from("<H", data, optional)[0] == 0x20B
+    directory = optional + (112 if is_pe32_plus else 96)
+    import_rva = struct.unpack_from("<I", data, directory + 8)[0]  # the second data directory: imports
+    sections = [struct.unpack_from("<4I", data, optional + optional_size + 40 * i + 8) for i in range(section_count)]
+
+    def to_offset(rva: int) -> int:
+        for virtual_size, virtual_address, raw_size, raw_pointer in sections:
+            if virtual_address <= rva < virtual_address + max(virtual_size, raw_size):
+                return rva - virtual_address + raw_pointer
+        raise ValueError(f"RVA {rva:#x} is in no section")
+
+    names: list[str] = []
+    descriptor = to_offset(import_rva) if import_rva else 0
+    while import_rva:
+        name_rva = struct.unpack_from("<I", data, descriptor + 12)[0]
+        if name_rva == 0:
+            break
+        start = to_offset(name_rva)
+        names.append(data[start : data.index(b"\0", start)].decode("ascii"))
+        descriptor += 20
+    return names
 
 
 def needed_libraries(module: Path) -> list[str]:
@@ -45,6 +80,8 @@ def needed_libraries(module: Path) -> list[str]:
             for line in lines.splitlines()
             if "(NEEDED)" in line and "[" in line
         ]
+    if system == "Windows":
+        return [name.lower() for name in pe_imported_dlls(module)]
     return []
 
 

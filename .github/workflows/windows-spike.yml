@@ -29,10 +29,15 @@ jobs:
         shell: bash
         run: |
           find . -name '*.obj' -o -name '*.o' | grep -i -E 'l1_|fortran' | head
-          for f in $(find . -path ./.venv -prune -o -name '*.f90.obj' -print -o -name '*.f90.o' -print); do echo "== $f"; nm -u "$f"; done
+          for f in $(find . -path ./.venv -prune -o -name '*.f90.obj' -print -o -name '*.f90.o' -print); do echo "== $f"; nm "$f" | head -60; echo "-- undefined:"; nm -u "$f"; done
       - name: Install and check the wheel
         shell: bash
         run: |
           uv venv --python 3.12 .test-venv
           uv pip install --python .test-venv/Scripts/python.exe dist/*.whl numpy
           .test-venv/Scripts/python.exe scripts/check_installed_wheel.py
+      - name: Imports of the module
+        shell: bash
+        run: |
+          .test-venv/Scripts/python.exe -c "import sys; sys.path.insert(0,'scripts'); import check_installed_wheel as c, l1fit._core as m; print(c.pe_imported_dlls(__import__('pathlib').Path(m.__file__)))"
+          dumpbin //dependents .test-venv/Lib/site-packages/l1fit/_core.pyd
