@@ -42,7 +42,7 @@ sdist.include = [
     "python/l1fit/*.pyi",
     "python/l1fit/py.typed",
     "src/*.f90",
-    "native/*.cpp",
+    "src/*.cpp",
     "CMakeLists.txt",
     "/README.md",
     "/pyproject.toml",
@@ -67,8 +67,7 @@ sdist.exclude = [
 cache-keys = [
     { file = "pyproject.toml" },
     { file = "CMakeLists.txt" },
-    { file = "native/**/*.cpp" },
-    { file = "src/**/*.f90" },
+    { file = "src/*" },
 ]
 
 # Linting and type checking cover the new Python package only.
@@ -76,7 +75,7 @@ cache-keys = [
 line-length = 100
 target-version = "py312"
 src = ["python"]
-extend-exclude = ["tests", "legacy", "build", "native", "python/l1fit/_core.pyi"]  # _core.pyi is generated
+extend-exclude = ["tests", "legacy", "build", "python/l1fit/_core.pyi"]  # _core.pyi is generated
 
 [tool.ruff.lint]
 select = [

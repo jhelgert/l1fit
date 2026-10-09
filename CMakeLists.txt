@@ -25,7 +25,7 @@ endif()
 find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module ${SKBUILD_SABI_COMPONENT})
 find_package(nanobind CONFIG REQUIRED)
 
-nanobind_add_module(_core STABLE_ABI NB_STATIC native/_core.cpp)
+nanobind_add_module(_core STABLE_ABI NB_STATIC src/_core.cpp)
 target_link_libraries(_core PRIVATE l1fit_fortran)
 
 # CMake adds the Fortran runtime library only when Fortran is the linker language. The module is linked

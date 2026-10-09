@@ -10,7 +10,7 @@ Fortran can be modernized and wrapped as a CPython extension without silently ch
 |------|---------|
 | `../src/l1_precision.f90` | Working precision `wp` (currently `c_double`) and accumulator precision `dp`. |
 | `../src/l1_calgo552.f90` | Fortran interface `cl1(k,l,m,n,q,kode,toler,iter,x,res,error)`: assumed-shape `contiguous` arrays, validated arguments, local workspace. Status constants `L1_OPTIMAL ... L1_ALLOC_FAILED`. |
-| `../src/l1_c_api.f90` | `bind(C)` wrapper `l1_cl1` with the same 11 arguments (explicit-shape arrays derived from `k,l,m,n`) for `ctypes` and for the CPython extension (`../native/_core.cpp`). |
+| `../src/l1_c_api.f90` | `bind(C)` wrapper `l1_cl1` with the same 11 arguments (explicit-shape arrays derived from `k,l,m,n`) for `ctypes` and for the CPython extension (`../src/_core.cpp`). |
 | `../legacy/CALGO552.f` | **Frozen oracle #1**: the repaired original (fixed-form, single precision, 18-argument interface). Never refactor this file. |
 | `../legacy/f90_double/` | **Frozen oracle #2**: the first free-form double-precision version (module + `cl1_` with the 18-argument interface), frozen before the interface was changed. Reference for bit-for-bit checks. Excluded from linting in `fortitude.toml`. |
 | `../legacy/CALGO552_as_received.f90.txt` | The file exactly as received (9 garbled lines, did not compile). |
@@ -51,7 +51,7 @@ All adapters call the library through `ctypes`; each is compiled with `gfortran`
 
 ```bash
 # all tests (about 10 s)
-uv sync                                  # builds the extension (editable); rebuilds when native/ or src/ change
+uv sync                                  # builds the extension (editable); rebuilds when src/ changes
 uv run pytest tests -q                   # everything, including the extension (about 15 s)
 
 # Fortran-only, without building the extension (the extension tests are then skipped)
@@ -272,7 +272,7 @@ error mapping). Three gaps were found and closed by new tests: nothing checked t
 threading test only proved safety, not that the GIL is released (it now measures the speed-up: 3.5x with
 4 threads, 1.03x with the GIL held).
 
-**Pitfall found on the way:** `uv sync` does not rebuild an editable install when only `native/` or `src/`
+**Pitfall found on the way:** `uv sync` does not rebuild an editable install when only files in `src/`
 change, unless told to (`tool.uv.cache-keys` in `pyproject.toml`). A first mutation run therefore tested the
 *unmutated* module eleven times and reported "all mutants survive"; it was spotted because the timings were
 identical to the millisecond. Always check that a mutation experiment really runs the mutated code.

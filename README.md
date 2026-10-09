@@ -69,18 +69,17 @@ The solver works in double precision. The default tolerance is `1e-10` and the d
 ## Development
 
 ```bash
-uv sync                                  # rebuilds when pyproject.toml, CMakeLists.txt, native/ or src/ change
+uv sync                                  # rebuilds when pyproject.toml, CMakeLists.txt or src/ change
 uv run pytest tests                      # tests (about 15 s), see tests/README.md
 uv run ruff check && uv run ruff format --check
 uv run pyrefly check
-uv run python -m nanobind.stubgen -m l1fit._core -o python/l1fit/_core.pyi   # after changing native/_core.cpp
+uv run python -m nanobind.stubgen -m l1fit._core -o python/l1fit/_core.pyi   # after changing src/_core.cpp
 ```
 
 | Path | Content |
 |------|---------|
 | `python/l1fit/` | The typed Python package: `solve_l1`, `L1Result`, `Status`, the generated stub `_core.pyi` |
-| `native/_core.cpp` | The nanobind binding (about 60 lines): validates shapes, releases the GIL, calls Fortran |
-| `src/` | The Fortran solver: `l1_calgo552.f90` (algorithm), `l1_c_api.f90` (C entry point), `l1_precision.f90` |
+| `src/` | The native code: the Fortran solver (`l1_calgo552.f90` algorithm, `l1_c_api.f90` C entry point, `l1_precision.f90`) and the nanobind binding `_core.cpp` (about 60 lines: validates shapes, releases the GIL, calls Fortran) |
 | `legacy/` | The original and the first modernized version, frozen as test oracles |
 | `tests/` | Tests, benchmarks and the comparison with the original (`tests/README.md`) |
 
