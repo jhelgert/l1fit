@@ -102,12 +102,12 @@ run, so the times include CVXPY's canonicalization). The factor is the time rela
 
 | Instance | Size `k x n` | Equality / inequality rows | l1fit | CVXPY + HiGHS simplex | CVXPY + HiGHS IPM | CVXPY + Clarabel |
 |---|---|---|--:|--:|--:|--:|
-| `500x10` | 500 x 10 | 0 / 0 | **0.5 ms** | 29.6 ms (58x) | 29.1 ms (57x) | 11.4 ms (22x) |
-| `2000x20` | 2000 x 20 | 0 / 0 | **8.6 ms** | 591 ms (68x) | 403 ms (47x) | 90.0 ms (10x) |
-| `2000x20_l3_m10` | 2000 x 20 | 3 / 10 | **9.8 ms** | 520 ms (53x) | 363 ms (37x) | 95.7 ms (10x) |
-| `300x100` | 300 x 100 | 0 / 0 | **9.9 ms** | 166 ms (17x) | 170 ms (17x) | 218 ms (22x) |
-| `5000x30` | 5000 x 30 | 0 / 0 | **60.5 ms** | 5283 ms (87x) | 2673 ms (44x) | 399 ms (7x) |
-| `cvxpy_script_1000x250` | 1000 x 250 | 10 / 200 | **162 ms** | 4514 ms (28x) | 3025 ms (19x) | 2586 ms (16x) |
+| `500x10` | 500 x 10 | 0 / 0 | **0.4 ms** | 28.7 ms (72x) | 28.2 ms (71x) | 11.2 ms (28x) |
+| `2000x20` | 2000 x 20 | 0 / 0 | **6.7 ms** | 582 ms (87x) | 393 ms (59x) | 87.7 ms (13x) |
+| `2000x20_l3_m10` | 2000 x 20 | 3 / 10 | **7.2 ms** | 516 ms (72x) | 354 ms (49x) | 93.3 ms (13x) |
+| `300x100` | 300 x 100 | 0 / 0 | **8.5 ms** | 160 ms (19x) | 165 ms (19x) | 247 ms (29x) |
+| `5000x30` | 5000 x 30 | 0 / 0 | **41.5 ms** | 5255 ms (127x) | 2571 ms (62x) | 385 ms (9x) |
+| `cvxpy_script_1000x250` | 1000 x 250 | 10 / 200 | **139 ms** | 4549 ms (33x) | 3028 ms (22x) | 2815 ms (20x) |
 
 Apple M1 Pro, Python 3.12.13, NumPy 2.5.3, CVXPY 1.9.3 (HiGHS 1.15.1 through `highspy`, Clarabel 0.11.1), default
 solver tolerances, `l1fit` with its defaults (`tol=1e-10`). Raw numbers, versions and per-solver details are in
@@ -117,9 +117,9 @@ solver tolerances, `l1fit` with its defaults (`tol=1e-10`). Raw numbers, version
 uv run --group bench python benchmarks/bench_cvxpy.py --json benchmarks/results/cvxpy.json
 ```
 
-`l1fit` is 7 to 87 times faster. Even when only the time that the solver itself reports is compared (leaving
-out CVXPY's modelling overhead), it stays 5 to 86 times faster: the dedicated simplex works on a `k x n` tableau,
-while the general LP is much larger. The optimal objectives agree to `1e-12` (HiGHS) and `1e-9` (Clarabel, whose
+`l1fit` is 9 to 127 times faster. Even when only the time that the solver itself reports is compared (leaving
+out CVXPY's modelling overhead), it stays 7 to 124 times faster: the dedicated simplex works on a `k x n` tableau,
+while the general LP is much larger. The optimal objectives agree to `1e-12` (HiGHS) and about `1e-9` (Clarabel, whose
 interior-point tolerance is looser). The comparison is between a specialised and a general-purpose solver on
 dense random problems (five with a planted feasible point and Student-t noise, `cvxpy_script_1000x250` with pure
 Gaussian data); the factors will differ on other data, and simplex methods

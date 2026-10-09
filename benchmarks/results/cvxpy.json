@@ -5,10 +5,10 @@
     "python": "3.12.13",
     "cvxpy": "1.9.3",
     "numpy": "2.5.3",
-    "l1fit": "0.1.0",
+    "l1fit": "0.1.1",
     "repeat_l1fit": 20,
     "repeat_cvxpy": 3,
-    "median_speedup_vs_best_cvxpy_total": 13.202671423343702
+    "median_speedup_vs_best_cvxpy_total": 16.010376692455175
   },
   "results": [
     {
@@ -18,30 +18,30 @@
       "l": 0,
       "m": 0,
       "l1fit": {
-        "seconds": 0.00864037498831749,
+        "seconds": 0.0066807500552386045,
         "objective": 2681.869205742248,
         "iterations": 115
       },
       "cvxpy": {
         "HiGHS simplex": {
-          "seconds": 0.5914547499269247,
-          "solver_seconds": 0.563325333991088,
+          "seconds": 0.581827791989781,
+          "solver_seconds": 0.5538279160391539,
           "objective": 2681.8692057432745,
           "status": "optimal",
           "objective_rel_diff": 3.8270500617746846e-13,
           "x_max_abs_diff": 8.853695554478236e-11
         },
         "HiGHS ipm": {
-          "seconds": 0.4027639999985695,
-          "solver_seconds": 0.3753145830705762,
+          "seconds": 0.39261812495533377,
+          "solver_seconds": 0.36578520806506276,
           "objective": 2681.869205742243,
           "status": "optimal",
           "objective_rel_diff": 1.8651994098148663e-15,
           "x_max_abs_diff": 7.93809462606987e-15
         },
         "Clarabel": {
-          "seconds": 0.09000375005416572,
-          "solver_seconds": 0.066606331,
+          "seconds": 0.08773158304393291,
+          "solver_seconds": 0.064366665,
           "objective": 2681.869206114715,
           "status": "optimal",
           "objective_rel_diff": 1.3888325674556307e-10,
@@ -56,30 +56,30 @@
       "l": 3,
       "m": 10,
       "l1fit": {
-        "seconds": 0.009838041965849698,
+        "seconds": 0.0071919159963727,
         "objective": 2528.635206177574,
         "iterations": 117
       },
       "cvxpy": {
         "HiGHS simplex": {
-          "seconds": 0.5203156659845263,
-          "solver_seconds": 0.4928147919708863,
+          "seconds": 0.5156269590370357,
+          "solver_seconds": 0.4873959169490263,
           "objective": 2528.6352061775733,
           "status": "optimal",
           "objective_rel_diff": 3.596780981103918e-16,
           "x_max_abs_diff": 9.71445146547012e-15
         },
         "HiGHS ipm": {
-          "seconds": 0.3634708330500871,
-          "solver_seconds": 0.3360280829947442,
+          "seconds": 0.35398354195058346,
+          "solver_seconds": 0.3263627920532599,
           "objective": 2528.6352061775733,
           "status": "optimal",
           "objective_rel_diff": 3.596780981103918e-16,
           "x_max_abs_diff": 9.71445146547012e-15
         },
         "Clarabel": {
-          "seconds": 0.09571304207202047,
-          "solver_seconds": 0.071478249,
+          "seconds": 0.09328124998137355,
+          "solver_seconds": 0.069096081,
           "objective": 2528.6352062012356,
           "status": "optimal",
           "objective_rel_diff": 9.357385400439952e-12,
@@ -94,30 +94,30 @@
       "l": 0,
       "m": 0,
       "l1fit": {
-        "seconds": 0.009899290977045894,
+        "seconds": 0.008456791983917356,
         "objective": 321.74201614478386,
         "iterations": 358
       },
       "cvxpy": {
         "HiGHS simplex": {
-          "seconds": 0.1657914590323344,
-          "solver_seconds": 0.14711729204282165,
+          "seconds": 0.15973829198628664,
+          "solver_seconds": 0.14167774992529303,
           "objective": 321.7420161450362,
           "status": "optimal",
           "objective_rel_diff": 7.84255470723411e-13,
           "x_max_abs_diff": 2.7631230636870896e-12
         },
         "HiGHS ipm": {
-          "seconds": 0.1697459170827642,
-          "solver_seconds": 0.1511574590113014,
+          "seconds": 0.16477062506601214,
+          "solver_seconds": 0.14676316699478775,
           "objective": 321.74201614480694,
           "status": "optimal",
           "objective_rel_diff": 7.172960601795559e-14,
           "x_max_abs_diff": 1.4599432773820809e-13
         },
         "Clarabel": {
-          "seconds": 0.21801670803688467,
-          "solver_seconds": 0.201448752,
+          "seconds": 0.24693391600158066,
+          "solver_seconds": 0.229130459,
           "objective": 321.7420162289222,
           "status": "optimal",
           "objective_rel_diff": 2.6150865282472774e-10,
@@ -132,30 +132,30 @@
       "l": 0,
       "m": 0,
       "l1fit": {
-        "seconds": 0.06047662510536611,
+        "seconds": 0.04147699999157339,
         "objective": 7001.6180265328585,
         "iterations": 236
       },
       "cvxpy": {
         "HiGHS simplex": {
-          "seconds": 5.283499874989502,
-          "solver_seconds": 5.184172209003009,
+          "seconds": 5.254561875015497,
+          "solver_seconds": 5.152642916073091,
           "objective": 7001.618026534066,
           "status": "optimal",
           "objective_rel_diff": 1.7250426392548373e-13,
           "x_max_abs_diff": 5.086675525234341e-11
         },
         "HiGHS ipm": {
-          "seconds": 2.6730409170268103,
-          "solver_seconds": 2.575834749964997,
+          "seconds": 2.5710480419220403,
+          "solver_seconds": 2.4763131249928847,
           "objective": 7001.618026532846,
           "status": "optimal",
           "objective_rel_diff": 1.818569047407208e-15,
           "x_max_abs_diff": 8.881784197001252e-15
         },
         "Clarabel": {
-          "seconds": 0.3992632500594482,
-          "solver_seconds": 0.315981872,
+          "seconds": 0.3854389580665156,
+          "solver_seconds": 0.305134999,
           "objective": 7001.618026642974,
           "status": "optimal",
           "objective_rel_diff": 1.5727115019766633e-11,
@@ -170,30 +170,30 @@
       "l": 0,
       "m": 0,
       "l1fit": {
-        "seconds": 0.0005097499815747142,
+        "seconds": 0.000398874981328845,
         "objective": 681.1176530560738,
         "iterations": 54
       },
       "cvxpy": {
         "HiGHS simplex": {
-          "seconds": 0.029621249996125698,
-          "solver_seconds": 0.024772124947048724,
+          "seconds": 0.02865983301308006,
+          "solver_seconds": 0.023785209050402045,
           "objective": 681.1176530560736,
           "status": "optimal",
           "objective_rel_diff": 3.338243758960587e-16,
           "x_max_abs_diff": 8.493206138382448e-15
         },
         "HiGHS ipm": {
-          "seconds": 0.029067292110994458,
-          "solver_seconds": 0.024200916988775134,
+          "seconds": 0.028222166933119297,
+          "solver_seconds": 0.023154625087045133,
           "objective": 681.1176530560736,
           "status": "optimal",
           "objective_rel_diff": 3.338243758960587e-16,
           "x_max_abs_diff": 7.466249840604178e-15
         },
         "Clarabel": {
-          "seconds": 0.0113957499852404,
-          "solver_seconds": 0.007135541,
+          "seconds": 0.011193250073119998,
+          "solver_seconds": 0.006782665,
           "objective": 681.1176531437011,
           "status": "optimal",
           "objective_rel_diff": 1.2865224240220616e-10,
@@ -208,30 +208,30 @@
       "l": 10,
       "m": 200,
       "l1fit": {
-        "seconds": 0.161732834065333,
+        "seconds": 0.1393838330404833,
         "objective": 946.55354021608,
         "iterations": 921
       },
       "cvxpy": {
         "HiGHS simplex": {
-          "seconds": 4.513695458997972,
-          "solver_seconds": 4.3601760000456125,
+          "seconds": 4.549048749962822,
+          "solver_seconds": 4.394110375083983,
           "objective": 946.5535402160881,
           "status": "optimal",
           "objective_rel_diff": 8.527531867232897e-15,
           "x_max_abs_diff": 3.71508379615193e-14
         },
         "HiGHS ipm": {
-          "seconds": 3.0254058750579134,
-          "solver_seconds": 2.8723755000391975,
+          "seconds": 3.027766084065661,
+          "solver_seconds": 2.875565249938518,
           "objective": 946.5535402160881,
           "status": "optimal",
           "objective_rel_diff": 8.527531867232897e-15,
           "x_max_abs_diff": 3.71508379615193e-14
         },
         "Clarabel": {
-          "seconds": 2.585896832984872,
-          "solver_seconds": 2.449585916,
+          "seconds": 2.8145500830141827,
+          "solver_seconds": 2.679422876,
           "objective": 946.5535392581647,
           "status": "optimal",
           "objective_rel_diff": 1.0120032829647898e-09,
