@@ -160,7 +160,7 @@ contains
               call set_up_phase2_costs(n, k, klm, iu, q, cu, iq, iphase)
           end if
 ! COMPUTE THE MARGINAL COSTS.
-          call compute_marginal_costs(n, klm, js, cu, q)
+          call compute_marginal_costs(n, klm, js, cu, q, res)
 
           iterate: do
 ! DETERMINE THE VECTOR TO ENTER THE BASIS.
@@ -336,7 +336,7 @@ contains
       end do
    end subroutine swap_columns
 
-   subroutine compute_marginal_costs(n, klm, first_column, costs, q)
+   subroutine compute_marginal_costs(n, klm, first_column, costs, q, basic_cost)
       !! Compute the marginal costs and store them in row `klm+1` of the simplex tableau `q`.
       !!
       !! For each column `j` from `first_column` to `n+1` the entry `q(klm+1,j)` is the sum over the
@@ -355,22 +355,21 @@ contains
          !! Costs of the variables, one row for each of the two signs of a variable
       real(wp), contiguous, intent(inout) :: q(:, :)
          !! Simplex tableau with at least `klm+2` rows and `n+2` columns; row `klm+1` is set
-      real(dp) :: weighted_sum
+      real(wp), contiguous, intent(inout) :: basic_cost(:)
+         !! Scratch space for at least `klm` values; holds the cost of the basic variable of each row
       real(wp) :: variable_cost
       integer :: i, j, label
 
+      do i = 1, klm
+         label = int(q(i, n + 2))
+         if (label < 0) then
+            basic_cost(i) = costs(2, -label)
+         else
+            basic_cost(i) = costs(1, label)
+         end if
+      end do
       do j = first_column, n + 1
-         weighted_sum = 0.0_dp
-         do i = 1, klm
-            label = int(q(i, n + 2))
-            if (label < 0) then
-               variable_cost = costs(2, -label)
-            else
-               variable_cost = costs(1, label)
-            end if
-            weighted_sum = weighted_sum + real(q(i, j), dp)*real(variable_cost, dp)
-         end do
-         q(klm + 1, j) = real(weighted_sum, wp)
+         q(klm + 1, j) = real(sum(real(q(1:klm, j), dp)*real(basic_cost(1:klm), dp)), wp)
       end do
       do j = first_column, n
          label = int(q(klm + 2, j))
@@ -461,15 +460,10 @@ contains
          !! Set to 1 if a restriction is violated by the starting basis; otherwise unchanged
       integer :: j
 
-      do j = 1, n
-         if (x(j) < 0.0_wp) then
-            costs(1, j) = 1.0_wp
-            restricted(1, j) = 1
-         else if (x(j) /= 0.0_wp) then
-            costs(2, j) = 1.0_wp
-            restricted(2, j) = 1
-         end if
-      end do
+      where (x(1:n) < 0.0_wp) costs(1, 1:n) = 1.0_wp
+      where (x(1:n) < 0.0_wp) restricted(1, 1:n) = 1
+      where (x(1:n) > 0.0_wp) costs(2, 1:n) = 1.0_wp
+      where (x(1:n) > 0.0_wp) restricted(2, 1:n) = 1
       do j = 1, k
          if (res(j) < 0.0_wp) then
             costs(1, n + j) = 1.0_wp
@@ -563,11 +557,10 @@ contains
       real(wp), contiguous, intent(inout) :: q(:, :)
          !! Simplex tableau with at least `klm+2` rows and `n+2` columns
       real(wp) :: multiplier, negative_pivot, label
-      integer :: i, j
+      integer :: j
 
-      do j = first_column, n + 1
-         if (j /= pivot_column) q(pivot_row, j) = q(pivot_row, j)/pivot_value
-      end do
+      q(pivot_row, first_column:pivot_column - 1) = q(pivot_row, first_column:pivot_column - 1)/pivot_value
+      q(pivot_row, pivot_column + 1:n + 1) = q(pivot_row, pivot_column + 1:n + 1)/pivot_value
       eliminate_columns: do j = first_column, n + 1
          if (j == pivot_column) cycle eliminate_columns
          multiplier = -q(pivot_row, j)
@@ -576,9 +569,8 @@ contains
          q(pivot_row + 1:klm + 1, j) = q(pivot_row + 1:klm + 1, j) + multiplier*q(pivot_row + 1:klm + 1, pivot_column)
       end do eliminate_columns
       negative_pivot = -pivot_value
-      do i = 1, klm + 1
-         if (i /= pivot_row) q(i, pivot_column) = q(i, pivot_column)/negative_pivot
-      end do
+      q(1:pivot_row - 1, pivot_column) = q(1:pivot_row - 1, pivot_column)/negative_pivot
+      q(pivot_row + 1:klm + 1, pivot_column) = q(pivot_row + 1:klm + 1, pivot_column)/negative_pivot
       q(pivot_row, pivot_column) = 1.0_wp/pivot_value
       label = q(pivot_row, n + 2)
       q(pivot_row, n + 2) = q(klm + 2, pivot_column)
@@ -864,8 +856,8 @@ contains
          !! The pivot `q(leaving_row, entering_column)`, as selected; left unchanged if not `found`
       logical, intent(out) :: found
          !! False if there is no candidate row (rounding errors)
-      real(wp) :: entry, total_cost
-      integer :: j, label, num_candidates
+      real(wp) :: total_cost
+      integer :: label, num_candidates
 
       found = .false.
       call collect_ratio_candidates(n, klm, toler, entering_column, q, ratios, rows, num_candidates)
@@ -886,11 +878,8 @@ contains
          total_cost = costs(1, label) + costs(2, label)
          if (q(klm + 1, entering_column) - pivot_value*total_cost <= toler) exit bypass
 ! BYPASS INTERMEDIATE VERTICES.
-         do j = first_column, n + 1
-            entry = q(leaving_row, j)
-            q(klm + 1, j) = q(klm + 1, j) - entry*total_cost
-            q(leaving_row, j) = -entry
-         end do
+         q(klm + 1, first_column:n + 1) = q(klm + 1, first_column:n + 1) - q(leaving_row, first_column:n + 1)*total_cost
+         q(leaving_row, first_column:n + 1) = -q(leaving_row, first_column:n + 1)
          q(leaving_row, n + 2) = -q(leaving_row, n + 2)
       end do bypass
       found = .true.
