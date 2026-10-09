@@ -108,8 +108,9 @@ python-version = "3.12"
 # platform for Python >= 3.12) and needs no Fortran runtime library, so there is nothing to bundle.
 [tool.cibuildwheel]
 build = "cp312-*"
+skip = "*-musllinux_*"  # manylinux only for now
 build-frontend = "uv"
-test-groups = ["dev"]
+test-requires = "numpy"
 test-command = "python {project}/tests/check_installed_wheel.py"
 
 [tool.cibuildwheel.macos]

@@ -23,7 +23,7 @@ uv sync                # development environment (builds the extension in editab
 uv build               # wheel (stable ABI: one wheel for Python >= 3.12) and sdist in dist/
 ```
 
-Python 3.12, 3.13, 3.14 and 3.15 are supported. Pre-built wheels for Linux, macOS and Windows are planned.
+Python 3.12, 3.13, 3.14 and 3.15 are supported. Wheels for Linux (manylinux) and macOS are built by `.github/workflows/wheels.yml`; Windows is planned.
 
 ## Usage
 
