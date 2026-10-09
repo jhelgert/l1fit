@@ -122,4 +122,5 @@ repair-wheel-command = ""  # no external libraries: nothing to bundle; scripts/c
 # MSVC compiles the C++ and the MinGW-w64 gfortran of the runner image the Fortran (CMakeLists.txt); the Visual Studio
 # generator cannot do Fortran, so Ninja is selected. No MinGW runtime DLL is needed, so nothing is bundled.
 environment = { CMAKE_GENERATOR = "Ninja", FC = "gfortran" }
+archs = ["AMD64"]  # no 32-bit (x86) wheels: MinGW-w64 gfortran of the runner is 64-bit only
 repair-wheel-command = ""
