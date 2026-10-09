@@ -571,9 +571,9 @@ contains
       eliminate_columns: do j = first_column, n + 1
          if (j == pivot_column) cycle eliminate_columns
          multiplier = -q(pivot_row, j)
-         do i = 1, klm + 1
-            if (i /= pivot_row) q(i, j) = q(i, j) + multiplier*q(i, pivot_column)
-         end do
+! ADD A MULTIPLE OF THE PIVOT COLUMN TO COLUMN J IN EVERY ROW BUT THE PIVOT ROW (TWO SECTIONS: NO TEST IN THE LOOP).
+         q(1:pivot_row - 1, j) = q(1:pivot_row - 1, j) + multiplier*q(1:pivot_row - 1, pivot_column)
+         q(pivot_row + 1:klm + 1, j) = q(pivot_row + 1:klm + 1, j) + multiplier*q(pivot_row + 1:klm + 1, pivot_column)
       end do eliminate_columns
       negative_pivot = -pivot_value
       do i = 1, klm + 1
@@ -740,24 +740,19 @@ contains
       integer, intent(inout) :: num_restricted_rows
          !! Number of restricted rows at the top of the tableau
       integer, intent(inout) :: leaving_row
-         !! Row of the leaving variable. On exit it is the pivot row if `found`. Otherwise it is the
-         !! last candidate that was examined, or unchanged if there are no restricted rows
+         !! Row of the leaving variable. On exit it is the pivot row if `found`. Otherwise it is the row
+         !! of the entry of the largest magnitude (which is too small to be a pivot), or unchanged if
+         !! there are no restricted rows
       real(wp), intent(inout) :: pivot_value
          !! The pivot `q(leaving_row, entering_column)`; only set if `found`
       logical, intent(out) :: found
          !! True if a pivot among the restricted rows was found
-      real(wp) :: largest, magnitude
-      integer :: i
+      real(wp) :: largest
 
       found = .false.
       if (num_restricted_rows == 0) return
-      largest = 0.0_wp
-      find_largest: do i = 1, num_restricted_rows
-         magnitude = abs(q(i, entering_column))
-         if (magnitude <= largest) cycle find_largest
-         largest = magnitude
-         leaving_row = i
-      end do find_largest
+      leaving_row = maxloc(abs(q(1:num_restricted_rows, entering_column)), dim=1)  ! the first one wins a tie
+      largest = abs(q(leaving_row, entering_column))
       if (largest <= toler) return
       call swap_rows(q, num_restricted_rows, leaving_row, n + 2)
       leaving_row = num_restricted_rows
@@ -816,22 +811,12 @@ contains
          !! Number of candidates (at least 1 on entry), decreased by one
       integer, intent(out) :: row
          !! Row of the removed candidate
-      real(wp) :: smallest_ratio
-      integer :: i, smallest_index
+      integer :: smallest_index
 
-      smallest_ratio = ratios(1)
-      row = rows(1)
-      smallest_index = 1
-      if (num_candidates /= 1) then
-         find_smallest: do i = 2, num_candidates
-            if (ratios(i) >= smallest_ratio) cycle find_smallest
-            smallest_index = i
-            smallest_ratio = ratios(i)
-            row = rows(i)
-         end do find_smallest
-         ratios(smallest_index) = ratios(num_candidates)
-         rows(smallest_index) = rows(num_candidates)
-      end if
+      smallest_index = minloc(ratios(1:num_candidates), dim=1)  ! the first one wins a tie
+      row = rows(smallest_index)
+      ratios(smallest_index) = ratios(num_candidates)
+      rows(smallest_index) = rows(num_candidates)
       num_candidates = num_candidates - 1
    end subroutine take_smallest_ratio
 
