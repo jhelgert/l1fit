@@ -108,6 +108,18 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y gfortran
 
+      - name: Select gfortran (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          fc="$(find /opt/homebrew/bin /usr/local/bin -name "gfortran*" 2>/dev/null | sort | head -n 1)"
+          if [ -z "$fc" ]; then
+            brew install gcc
+            fc="$(find /opt/homebrew/bin /usr/local/bin -name "gfortran*" | sort | head -n 1)"
+          fi
+          mkdir -p "$RUNNER_TEMP/fortran-bin"
+          ln -s "$fc" "$RUNNER_TEMP/fortran-bin/gfortran"
+          echo "$RUNNER_TEMP/fortran-bin" >> "$GITHUB_PATH"
+
       - name: Check gfortran
         run: gfortran --version
 
