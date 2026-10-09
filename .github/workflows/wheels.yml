@@ -179,6 +179,7 @@ jobs:
       name: pypi
       url: https://pypi.org/project/l1fit/
     permissions:
+      contents: read  # checkout (a job-level permissions block replaces the defaults)
       id-token: write  # the only job that may request the OIDC token
     steps:
       - uses: actions/checkout@v7
