@@ -19,11 +19,17 @@ a thin, typed [nanobind](https://nanobind.readthedocs.io) binding that releases 
 
 ## Installation
 
-`l1fit` is not on PyPI yet. Wheels for Linux (x86_64, aarch64), macOS (arm64, x86_64) and Windows (x86_64) are built by
-`.github/workflows/wheels.yml`. One wheel per platform covers Python 3.12 to 3.15 (stable ABI). They need
-nothing but NumPy: the Fortran code uses no runtime library, so there is no `libgfortran` to bundle.
+`l1fit` is available on [PyPI](https://pypi.org/project/l1fit/):
 
-To build from source you need a Fortran compiler (`gfortran`; on Windows the MinGW-w64 one, next to MSVC for the
+```bash
+uv add l1fit        # or: pip install l1fit
+```
+
+There is one wheel per platform for Linux (x86_64, aarch64), macOS (arm64, x86_64) and Windows (x86_64); each covers
+Python 3.12 to 3.15 (stable ABI). They need nothing but NumPy: the Fortran code uses no runtime library, so there is
+no `libgfortran` to bundle. The wheels are built by `.github/workflows/wheels.yml`.
+
+To build from source (other platforms, or for development) you need a Fortran compiler (`gfortran`; on Windows the MinGW-w64 one, next to MSVC for the
 C++), a C++17 compiler and CMake. [uv](https://docs.astral.sh/uv/) builds the extension with scikit-build-core:
 
 ```bash
