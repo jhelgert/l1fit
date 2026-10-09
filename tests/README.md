@@ -279,7 +279,7 @@ identical to the millisecond. Always check that a mutation experiment really run
 
 **Wheels and Windows.** The Fortran needs no runtime library: `L1FIT_FORTRAN_RUNTIME` in `CMakeLists.txt` is
 `NONE` (default), `SHARED` or `STATIC`, and the default build links neither `libgfortran` nor `libquadmath`
-(guarded by `cmake/check_no_fortran_runtime.cmake` and `tests/check_installed_wheel.py`). manylinux_2_28
+(guarded by `cmake/check_no_fortran_runtime.cmake` and `scripts/check_installed_wheel.py`). manylinux_2_28
 aarch64 and x86_64 wheels were built locally with cibuildwheel 4.3.0 under Colima (auditwheel, abi3audit and
 the installed-wheel check pass); musllinux is skipped. There is no `gfortran` on Windows; the plan is LFortran
 there, which is unverified: it has to compile the F2018 features that the solver uses

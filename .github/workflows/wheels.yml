@@ -54,9 +54,21 @@ jobs:
 
       - uses: astral-sh/setup-uv@v10.2.0
 
-      # The Linux wheels are built in a manylinux container, where the Fortran compiler has to be installed
-      # (pyproject.toml, [tool.cibuildwheel.linux]). On macOS the build uses the gfortran of the runner image;
-      # the test job prints its version, so a runner image without one fails visibly.
+      # The Linux wheels are built in a manylinux container
+      # (manylinux_2_28 ships gfortran 14, nothing to install).
+      # The macOS runner images have no unversioned gfortran on the PATH: use the versioned one that Homebrew's
+      # gcc provides, or install gcc. FC tells CMake which compiler to use.
+      - name: Select gfortran (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          fc="$(find /opt/homebrew/bin /usr/local/bin -name "gfortran*" 2>/dev/null | sort | head -n 1)"
+          if [ -z "$fc" ]; then
+            brew install gcc
+            fc="$(find /opt/homebrew/bin /usr/local/bin -name "gfortran*" | sort | head -n 1)"
+          fi
+          echo "FC=$fc" >> "$GITHUB_ENV"
+          "$fc" --version
+
       # package-dir does not expand globs, so resolve the sdist file name first.
       - name: Locate the sdist
         id: sdist
@@ -123,7 +135,7 @@ jobs:
           .test-venv/bin/python -c "import l1fit; print(l1fit.__file__)"
 
       - name: Check the installed wheel
-        run: .test-venv/bin/python tests/check_installed_wheel.py
+        run: .test-venv/bin/python scripts/check_installed_wheel.py
 
       - name: Run the test-suite against the installed wheel
         run: .test-venv/bin/python -m pytest tests -q -p no:cacheprovider

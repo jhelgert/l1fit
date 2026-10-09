@@ -48,6 +48,7 @@ sdist.include = [
     "cmake/*.cmake",
     "/README.md",
     "/pyproject.toml",
+    "/scripts/check_installed_wheel.py",  # run by the wheel jobs as the cibuildwheel test-command
 ]
 sdist.exclude = [
     "**/__pycache__",
@@ -57,8 +58,8 @@ sdist.exclude = [
     "/.ruff_cache",
     "/.gitignore",
     "/build",
-    "/dist",
     "/tests",
+    "/dist",
     "/legacy",
     "/.agents",
     "/.github",
@@ -111,8 +112,8 @@ build = "cp312-*"
 skip = "*-musllinux_*"  # manylinux only for now
 build-frontend = "uv"
 test-requires = "numpy"
-test-command = "python {project}/tests/check_installed_wheel.py"
+test-command = "python {project}/scripts/check_installed_wheel.py"
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
-repair-wheel-command = ""  # no external libraries: nothing to bundle; tests/check_installed_wheel.py checks it
+repair-wheel-command = ""  # no external libraries: nothing to bundle; scripts/check_installed_wheel.py checks it
