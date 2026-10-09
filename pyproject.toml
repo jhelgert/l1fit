@@ -117,3 +117,9 @@ test-command = "python {project}/scripts/check_installed_wheel.py"
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
 repair-wheel-command = ""  # no external libraries: nothing to bundle; scripts/check_installed_wheel.py checks it
+
+[tool.cibuildwheel.windows]
+# MSVC compiles the C++ and the MinGW-w64 gfortran of the runner image the Fortran (CMakeLists.txt); the Visual Studio
+# generator cannot do Fortran, so Ninja is selected. No MinGW runtime DLL is needed, so nothing is bundled.
+environment = { CMAKE_GENERATOR = "Ninja", FC = "gfortran" }
+repair-wheel-command = ""
